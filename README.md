@@ -2,7 +2,7 @@
 
 Codex Switch 是一个 Windows 桌面端 Codex 账号切换工具，用于在本机管理多个 Codex OAuth 登录凭据，并在需要时切换当前 Windows 用户下的 Codex 登录状态。
 
-项目基于 Tauri、Vue 3、TypeScript 和 Yarn 构建。
+项目基于 Tauri 2、Vue 3、TypeScript 和 Yarn 构建。
 
 ## 功能
 
