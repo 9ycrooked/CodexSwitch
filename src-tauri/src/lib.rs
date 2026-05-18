@@ -20,7 +20,15 @@ use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
 use toml_edit::{DocumentMut, Item, Table};
 use uuid::Uuid;
 
-type AppResult<T> = Result<T, String>;
+mod error;
+mod io;
+mod models;
+mod paths;
+
+use error::{stringify_io, AppResult};
+use io::{atomic_write_json, atomic_write_text, read_json};
+use models::*;
+use paths::{account_dir, app_store_dir, settings_path};
 
 const OAUTH_AUTH_URL: &str = "https://auth.openai.com/oauth/authorize";
 const OAUTH_TOKEN_URL: &str = "https://auth.openai.com/oauth/token";
@@ -54,111 +62,6 @@ pub struct Settings {
     pub force_update_on_startup: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AccountSummary {
-    #[serde(default)]
-    pub id: String,
-    #[serde(default)]
-    pub display_name: String,
-    #[serde(default)]
-    pub email: Option<String>,
-    #[serde(default)]
-    pub account_id: Option<String>,
-    #[serde(default)]
-    pub plan: Option<String>,
-    #[serde(default)]
-    pub expired: Option<String>,
-    #[serde(default)]
-    pub disabled: bool,
-    #[serde(default)]
-    pub imported_at: String,
-    #[serde(default)]
-    pub has_config: bool,
-    #[serde(default)]
-    pub browser_profile_dir: Option<String>,
-    #[serde(default)]
-    pub oauth_metadata: Option<OAuthMetadata>,
-    #[serde(default)]
-    pub quota_state: Option<QuotaState>,
-    #[serde(default)]
-    pub usage_state: Option<UsageState>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BackupSummary {
-    pub id: String,
-    pub created_at: String,
-    pub auth_path: Option<String>,
-    pub config_path: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CodexState {
-    pub codex_home: String,
-    pub auth_exists: bool,
-    pub config_exists: bool,
-    pub current_account_id: Option<String>,
-    pub current_email: Option<String>,
-    pub current_auth_mode: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SwitchResult {
-    pub account: AccountSummary,
-    pub backup_id: String,
-    pub warnings: Vec<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct OAuthMetadata {
-    pub email: Option<String>,
-    pub account_id: Option<String>,
-    pub plan_type: Option<String>,
-    pub subscription_until: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OAuthLoginStart {
-    pub auth_url: String,
-    pub profile_id: String,
-    pub browser_profile_dir: String,
-    pub callback_port: u16,
-    pub state: String,
-    pub mode: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct QuotaState {
-    pub status: String,
-    pub last_checked_at: Option<String>,
-    pub last_error: Option<String>,
-    pub resets_at: Option<String>,
-    pub resets_in_seconds: Option<i64>,
-    pub model: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct UsageState {
-    pub status: String,
-    pub last_checked_at: Option<String>,
-    pub last_error: Option<String>,
-    pub http_status: Option<u16>,
-    pub resets_at: Option<String>,
-    pub raw_plan_type: Option<String>,
-    #[serde(default)]
-    pub windows: Vec<CodexQuotaWindow>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct CodexQuotaWindow {
-    pub id: String,
-    pub label: String,
-    pub used_percent: Option<f64>,
-    pub reset_at: Option<String>,
-    pub reset_label: String,
-    pub limit_reached: bool,
-}
-
 #[derive(Debug, Clone)]
 struct OAuthPending {
     state: String,
@@ -168,31 +71,6 @@ struct OAuthPending {
     browser_profile_dir: PathBuf,
     window_label: String,
     cancel: Arc<AtomicBool>,
-}
-
-#[derive(Debug, Deserialize)]
-struct TokenResponse {
-    access_token: String,
-    #[serde(default)]
-    refresh_token: String,
-    id_token: String,
-    #[serde(default)]
-    expires_in: i64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct StoredAccount {
-    summary: AccountSummary,
-    auth_json: Value,
-    original_json: Value,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct BackupMeta {
-    id: String,
-    created_at: String,
-    auth_path: Option<String>,
-    config_path: Option<String>,
 }
 
 pub fn run() {
@@ -1799,10 +1677,6 @@ fn load_account(id: &str) -> AppResult<StoredAccount> {
     })
 }
 
-fn account_dir(id: &str) -> AppResult<PathBuf> {
-    Ok(app_store_dir()?.join("accounts").join(sanitize_id(id)))
-}
-
 fn load_settings() -> AppResult<Settings> {
     let path = settings_path()?;
     if path.exists() {
@@ -1876,58 +1750,6 @@ fn sanitize_oauth_login_mode(value: &str) -> String {
         "embedded".to_string()
     } else {
         "external".to_string()
-    }
-}
-
-fn settings_path() -> AppResult<PathBuf> {
-    Ok(app_store_dir()?.join("settings.json"))
-}
-
-fn app_store_dir() -> AppResult<PathBuf> {
-    let base = dirs::data_dir()
-        .or_else(dirs::config_dir)
-        .ok_or_else(|| "无法定位应用数据目录。".to_string())?;
-    Ok(base.join("codex-account-switcher"))
-}
-
-fn read_json<T: for<'de> Deserialize<'de>>(path: &Path) -> AppResult<T> {
-    let text = fs::read_to_string(path).map_err(stringify_io)?;
-    serde_json::from_str(&text).map_err(|err| format!("JSON 解析失败 {}：{err}", path.display()))
-}
-
-fn atomic_write_json<T: Serialize>(path: &Path, value: &T) -> AppResult<()> {
-    let text = serde_json::to_string_pretty(value).map_err(|err| err.to_string())?;
-    atomic_write_text(path, &format!("{text}\n"))
-}
-
-fn atomic_write_text(path: &Path, text: &str) -> AppResult<()> {
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(stringify_io)?;
-    }
-    let temp = path.with_extension(format!(
-        "{}.tmp",
-        path.extension()
-            .and_then(|item| item.to_str())
-            .unwrap_or("file")
-    ));
-    {
-        let mut file = fs::File::create(&temp).map_err(stringify_io)?;
-        file.write_all(text.as_bytes()).map_err(stringify_io)?;
-        file.sync_all().map_err(stringify_io)?;
-    }
-    match fs::rename(&temp, path) {
-        Ok(_) => Ok(()),
-        Err(first_err) if path.exists() => {
-            fs::remove_file(path).map_err(|err| {
-                let _ = fs::remove_file(&temp);
-                format!(
-                    "替换 {} 失败：{first_err}；删除旧文件也失败：{err}",
-                    path.display()
-                )
-            })?;
-            fs::rename(&temp, path).map_err(stringify_io)
-        }
-        Err(err) => Err(stringify_io(err)),
     }
 }
 
@@ -2105,10 +1927,6 @@ fn matching_config_path(json_path: &Path, toml_paths: &[PathBuf]) -> Option<Path
                 .unwrap_or(false)
         })
         .cloned()
-}
-
-fn stringify_io(err: std::io::Error) -> String {
-    err.to_string()
 }
 
 #[cfg(test)]
