@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 use crate::accounts::{list_accounts, load_account, now_string, save_account_record};
-use crate::error::AppResult;
+use crate::error::{run_blocking, AppResult};
 use crate::models::{CodexQuotaWindow, QuotaState, StoredAccount, UsageState};
 
 const CODEX_BASE_URL: &str = "https://chatgpt.com/backend-api/codex";
@@ -12,7 +12,17 @@ const CODEX_USAGE_URL: &str = "https://chatgpt.com/backend-api/wham/usage";
 const QUOTA_WINDOW_FIVE_HOURS: i64 = 18_000;
 const QUOTA_WINDOW_WEEK: i64 = 604_800;
 #[tauri::command]
-pub fn check_account_quota(account_id: String, model: Option<String>) -> AppResult<QuotaState> {
+pub async fn check_account_quota(
+    account_id: String,
+    model: Option<String>,
+) -> AppResult<QuotaState> {
+    run_blocking(move || check_account_quota_blocking(account_id, model)).await
+}
+
+fn check_account_quota_blocking(
+    account_id: String,
+    model: Option<String>,
+) -> AppResult<QuotaState> {
     let mut account = load_account(&account_id)?;
     let token = account
         .auth_json
@@ -43,7 +53,11 @@ pub fn list_quota_states() -> AppResult<HashMap<String, QuotaState>> {
 }
 
 #[tauri::command]
-pub fn fetch_codex_usage(account_id: String) -> AppResult<UsageState> {
+pub async fn fetch_codex_usage(account_id: String) -> AppResult<UsageState> {
+    run_blocking(move || fetch_codex_usage_blocking(account_id)).await
+}
+
+fn fetch_codex_usage_blocking(account_id: String) -> AppResult<UsageState> {
     let mut account = load_account(&account_id)?;
     let state = fetch_codex_usage_for_account(&account)?;
     account.summary.usage_state = Some(state.clone());
@@ -64,7 +78,11 @@ pub fn list_usage_states() -> AppResult<HashMap<String, UsageState>> {
 }
 
 #[tauri::command]
-pub fn clear_usage_state(account_id: String) -> AppResult<()> {
+pub async fn clear_usage_state(account_id: String) -> AppResult<()> {
+    run_blocking(move || clear_usage_state_blocking(account_id)).await
+}
+
+fn clear_usage_state_blocking(account_id: String) -> AppResult<()> {
     let mut account = load_account(&account_id)?;
     account.summary.usage_state = None;
     save_account_record(&account.summary, &account.auth_json, &account.original_json)

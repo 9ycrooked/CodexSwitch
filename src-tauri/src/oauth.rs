@@ -20,7 +20,7 @@ use crate::accounts::{
     auth_json_from_token_response, load_account, now_string, sanitize_id, save_account_record,
     summary_from_auth_json,
 };
-use crate::error::{stringify_io, AppResult};
+use crate::error::{run_blocking, stringify_io, AppResult};
 use crate::models::{AccountSummary, OAuthLoginStart, TokenResponse};
 use crate::settings::{self, load_settings};
 
@@ -190,7 +190,11 @@ pub fn complete_oauth_login(callback_query: String) -> AppResult<AccountSummary>
 }
 
 #[tauri::command]
-pub fn refresh_account_tokens(account_id: String) -> AppResult<AccountSummary> {
+pub async fn refresh_account_tokens(account_id: String) -> AppResult<AccountSummary> {
+    run_blocking(move || refresh_account_tokens_blocking(account_id)).await
+}
+
+fn refresh_account_tokens_blocking(account_id: String) -> AppResult<AccountSummary> {
     let mut account = load_account(&account_id)?;
     let refresh_token = account
         .auth_json

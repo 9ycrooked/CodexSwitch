@@ -5,14 +5,18 @@ use crate::accounts::{import_account_json, load_account, matching_config_path};
 use crate::backups::create_backup;
 use crate::codex_home::{account_warnings, close_codex_processes};
 use crate::config_merge::merge_config_files;
-use crate::error::{stringify_io, AppResult};
+use crate::error::{run_blocking, stringify_io, AppResult};
 use crate::io::{atomic_write_json, atomic_write_text};
 use crate::models::{AccountSummary, SwitchResult};
 use crate::paths::{account_dir, app_store_dir};
 use crate::settings::load_settings;
 
 #[tauri::command]
-pub fn import_accounts(paths: Vec<String>) -> AppResult<Vec<AccountSummary>> {
+pub async fn import_accounts(paths: Vec<String>) -> AppResult<Vec<AccountSummary>> {
+    run_blocking(move || import_accounts_blocking(paths)).await
+}
+
+fn import_accounts_blocking(paths: Vec<String>) -> AppResult<Vec<AccountSummary>> {
     if paths.is_empty() {
         return Err("请选择至少一个账号文件。".into());
     }
@@ -52,7 +56,11 @@ pub fn import_accounts(paths: Vec<String>) -> AppResult<Vec<AccountSummary>> {
 }
 
 #[tauri::command]
-pub fn switch_account(account_id: String) -> AppResult<SwitchResult> {
+pub async fn switch_account(account_id: String) -> AppResult<SwitchResult> {
+    run_blocking(move || switch_account_blocking(account_id)).await
+}
+
+fn switch_account_blocking(account_id: String) -> AppResult<SwitchResult> {
     let settings = load_settings()?;
     let account = load_account(&account_id)?;
     let codex_home = PathBuf::from(&settings.codex_home);

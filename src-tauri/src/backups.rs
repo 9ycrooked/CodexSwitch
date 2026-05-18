@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use uuid::Uuid;
 
 use crate::accounts::now_string;
-use crate::error::{stringify_io, AppResult};
+use crate::error::{run_blocking, stringify_io, AppResult};
 use crate::io::{atomic_write_json, atomic_write_text, read_json};
 use crate::models::{BackupMeta, BackupSummary};
 use crate::paths::app_store_dir;
@@ -39,13 +39,21 @@ pub fn list_backups() -> AppResult<Vec<BackupSummary>> {
 }
 
 #[tauri::command]
-pub fn backup_current_state() -> AppResult<BackupSummary> {
+pub async fn backup_current_state() -> AppResult<BackupSummary> {
+    run_blocking(backup_current_state_blocking).await
+}
+
+fn backup_current_state_blocking() -> AppResult<BackupSummary> {
     let settings = load_settings()?;
     create_backup(&settings)
 }
 
 #[tauri::command]
-pub fn restore_backup(backup_id: String) -> AppResult<()> {
+pub async fn restore_backup(backup_id: String) -> AppResult<()> {
+    run_blocking(move || restore_backup_blocking(backup_id)).await
+}
+
+fn restore_backup_blocking(backup_id: String) -> AppResult<()> {
     let settings = load_settings()?;
     let codex_home = PathBuf::from(settings.codex_home);
     fs::create_dir_all(&codex_home).map_err(stringify_io)?;
