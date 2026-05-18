@@ -32,11 +32,11 @@
 }
 
 .titlebar-mark {
-  width: 14px;
-  height: 14px;
-  border: 1px solid color-mix(in srgb, var(--success-color) 38%, var(--border-color));
-  border-radius: 3px;
-  background: color-mix(in srgb, var(--success-color) 34%, var(--bg-tertiary));
+  display: block;
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  border-radius: 4px;
 }
 
 .titlebar-drag-region {

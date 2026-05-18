@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Minus, Square, X } from "lucide-vue-next";
+import titlebarIcon from "../assets/CodexSwitch.png";
 
 defineProps<{
   onMinimize: () => void;
@@ -13,7 +14,7 @@ defineProps<{
 <template>
   <header class="app-titlebar">
     <div class="titlebar-brand" @mousedown="onStartDrag" @dblclick="onDoubleClick">
-      <span class="titlebar-mark" aria-hidden="true"></span>
+      <img class="titlebar-mark" :src="titlebarIcon" alt="" aria-hidden="true" />
       <span>Codex Switch</span>
     </div>
     <div class="titlebar-drag-region" @mousedown="onStartDrag" @dblclick="onDoubleClick"></div>
