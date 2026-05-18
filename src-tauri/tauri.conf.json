@@ -27,6 +27,15 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "createUpdaterArtifacts": true,
     "icon": []
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDZDMzc0MkVFMERCOEQ1RjQKUldUMDFiZ043a0kzYkF1NG5iRE9IQmpWRHdWYy8rWVIzQU1iZzlsV1JJR3ZPd0lvRDVrSVEraUcK",
+      "endpoints": [
+        "https://github.com/9ycrooked/CodexSwitch/releases/latest/download/latest.json"
+      ]
+    }
   }
 }
