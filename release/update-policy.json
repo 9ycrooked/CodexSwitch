@@ -1,0 +1,5 @@
+{
+  "check_updates_on_startup": true,
+  "force_update_on_startup": false,
+  "message": "发现新版本时会显示更新内容，你可以选择立即更新或稍后处理。"
+}

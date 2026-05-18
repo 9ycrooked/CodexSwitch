@@ -94,6 +94,52 @@ DESIGN.md             UI design notes
 - Quota checks are manual and are not polled in the background.
 - OAuth login uses normal browser/WebView behavior with isolated profiles. It does not spoof Canvas, WebGL, hardware, fonts, or device fingerprints.
 
+## Release Workflow
+
+Codex Switch uses Tauri updater artifacts and GitHub Draft Releases.
+
+1. Update the version in:
+   - `package.json`
+   - `src-tauri/tauri.conf.json`
+   - `src-tauri/Cargo.toml`
+
+2. Commit and push:
+
+   ```powershell
+   git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml src-tauri/Cargo.lock
+   git commit -m "chore: release v0.1.1"
+   git push
+   ```
+
+3. Edit `release/update-policy.json` if this version should change updater behavior:
+
+   ```json
+   {
+     "check_updates_on_startup": true,
+     "force_update_on_startup": false,
+     "message": "发现新版本时会显示更新内容，你可以选择立即更新或稍后处理。"
+   }
+   ```
+
+   `check_updates_on_startup` controls whether the app checks on launch. `force_update_on_startup` controls whether a discovered update can be dismissed. The default policy checks on startup and does not force the update.
+
+4. Create and push a tag:
+
+   ```powershell
+   git tag v0.1.1
+   git push origin v0.1.1
+   ```
+
+5. Wait for GitHub Actions to create a Draft Release.
+
+6. Open the Draft Release and edit the Release body. This body is displayed in the app update dialog.
+
+7. Confirm the Windows installer, updater artifacts, `latest.json`, and `update-policy.json` are attached.
+
+8. Publish the Release.
+
+After the Release is published, Codex Switch can detect it on startup and show the update dialog.
+
 ## License
 
 MIT
