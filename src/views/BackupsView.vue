@@ -5,6 +5,8 @@ import { formatDate } from "../utils/format";
 defineProps<{
   backups: BackupSummary[];
   busy: boolean;
+  isOperationActive: (key: string) => boolean;
+  hasActiveOperation: boolean;
 }>();
 
 defineEmits<{
@@ -28,7 +30,13 @@ defineEmits<{
             {{ backup.config_path ? "有" : "无" }}
           </small>
         </div>
-        <button class="secondary" :disabled="busy" @click="$emit('restoreBackup', backup)">恢复</button>
+        <button
+          class="secondary"
+          :disabled="busy || isOperationActive('backup:restore:' + backup.id)"
+          @click="$emit('restoreBackup', backup)"
+        >
+          恢复
+        </button>
       </article>
     </div>
   </section>

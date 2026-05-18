@@ -15,6 +15,8 @@ defineProps<{
   filteredAccounts: AccountSummary[];
   current: CodexState | null;
   busy: boolean;
+  isOperationActive: (key: string) => boolean;
+  hasActiveOperation: boolean;
   query: string;
 }>();
 
@@ -105,12 +107,18 @@ function inputValue(event: Event) {
             <div class="card-actions">
               <button
                 class="primary-action-button"
-                :disabled="busy || isCurrentAccount(account, current)"
+                :disabled="busy || isCurrentAccount(account, current) || isOperationActive('switch:' + account.id)"
                 @click="$emit('switchAccount', account)"
               >
                 切换
               </button>
-              <button class="secondary" :disabled="busy" @click="$emit('refreshTokens', account)">刷新认证</button>
+              <button
+                class="secondary"
+                :disabled="busy || isOperationActive('refresh-token:' + account.id)"
+                @click="$emit('refreshTokens', account)"
+              >
+                刷新认证
+              </button>
               <button class="secondary" :disabled="busy" @click="$emit('selectQuotaAccount', account)">查看额度</button>
             </div>
           </div>

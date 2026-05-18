@@ -4,36 +4,43 @@ import * as api from "../api/codexSwitchApi";
 
 export function useBackups(deps: {
   backups: Ref<BackupSummary[]>;
-  busy: Ref<boolean>;
+  activeOperation: Ref<string>;
   refreshAll: () => Promise<void>;
   setMessage: (message: string, isError?: boolean) => void;
 }) {
-  async function createBackup() {
-    deps.busy.value = true;
+  async function runOperation(key: string, work: () => Promise<void>) {
+    deps.activeOperation.value = key;
     try {
-      const backup = await api.backupCurrentState();
-      await deps.refreshAll();
-      deps.setMessage(`已创建备份 ${backup.id}。`);
-    } catch (err) {
-      deps.setMessage(String(err), true);
+      await work();
     } finally {
-      deps.busy.value = false;
+      if (deps.activeOperation.value === key) deps.activeOperation.value = "";
     }
+  }
+
+  async function createBackup() {
+    await runOperation("backup:create", async () => {
+      try {
+        const backup = await api.backupCurrentState();
+        await deps.refreshAll();
+        deps.setMessage(`已创建备份 ${backup.id}。`);
+      } catch (err) {
+        deps.setMessage(String(err), true);
+      }
+    });
   }
 
   async function restoreBackup(backup: BackupSummary) {
     const ok = window.confirm(`恢复备份 ${backup.id}？当前 auth.json/config.toml 会先被替换。`);
     if (!ok) return;
-    deps.busy.value = true;
-    try {
-      await api.restoreBackup(backup.id);
-      await deps.refreshAll();
-      deps.setMessage(`已恢复备份 ${backup.id}。`);
-    } catch (err) {
-      deps.setMessage(String(err), true);
-    } finally {
-      deps.busy.value = false;
-    }
+    await runOperation(`backup:restore:${backup.id}`, async () => {
+      try {
+        await api.restoreBackup(backup.id);
+        await deps.refreshAll();
+        deps.setMessage(`已恢复备份 ${backup.id}。`);
+      } catch (err) {
+        deps.setMessage(String(err), true);
+      }
+    });
   }
 
   return {

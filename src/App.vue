@@ -23,6 +23,7 @@ const current = ref<CodexState | null>(null);
 const selectedTab = ref<"accounts" | "quota" | "backups" | "settings">("accounts");
 const query = ref("");
 const busy = ref(false);
+const activeOperation = ref("");
 const notice = ref("");
 const error = ref("");
 
@@ -47,6 +48,11 @@ const filteredAccounts = computed(() => {
       .some((value) => String(value).toLowerCase().includes(needle));
   });
 });
+const hasActiveOperation = computed(() => Boolean(activeOperation.value));
+
+function isOperationActive(key: string) {
+  return activeOperation.value === key;
+}
 
 function updateProcessNames(event: Event) {
   settings.process_names = (event.target as HTMLInputElement).value.split(",");
@@ -68,6 +74,17 @@ async function refreshAll() {
   backups.value = nextBackups;
   current.value = nextCurrent;
   Object.assign(settings, nextSettings);
+}
+
+async function refreshAllWithBusy() {
+  busy.value = true;
+  try {
+    await refreshAll();
+  } catch (err) {
+    setMessage(String(err), true);
+  } finally {
+    busy.value = false;
+  }
 }
 
 const {
@@ -101,7 +118,7 @@ const {
 const { chooseAndImport, startOAuthLogin, closeOAuthLogin, refreshTokens, switchAccount } = useAccounts({
   accounts,
   current,
-  busy,
+  activeOperation,
   refreshAll,
   setMessage
 });
@@ -114,14 +131,14 @@ const {
   clearUsage
 } = useQuota({
   accounts,
-  busy,
+  activeOperation,
   refreshAll,
   setMessage
 });
 
 const { createBackup, restoreBackup } = useBackups({
   backups,
-  busy,
+  activeOperation,
   refreshAll,
   setMessage
 });
@@ -140,7 +157,8 @@ function selectTab(tab: Tab) {
 }
 
 async function saveSettings() {
-  busy.value = true;
+  const operationKey = "settings:save";
+  activeOperation.value = operationKey;
   try {
     const processNames = settings.process_names
       .flatMap((item) => item.split(","))
@@ -163,7 +181,7 @@ async function saveSettings() {
   } catch (err) {
     setMessage(String(err), true);
   } finally {
-    busy.value = false;
+    if (activeOperation.value === operationKey) activeOperation.value = "";
   }
 }
 
@@ -205,14 +223,18 @@ onMounted(async () => {
           <h2 v-else>设置</h2>
         </div>
         <div class="actions">
-          <button class="secondary" :disabled="busy" @click="refreshAll">
+          <button class="secondary" :disabled="busy" @click="refreshAllWithBusy">
             <svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true">
               <path d="M21 12a9 9 0 1 1-2.64-6.36" />
               <path d="M21 3v6h-6" />
             </svg>
             <span>刷新</span>
           </button>
-          <button v-if="selectedTab === 'accounts'" :disabled="busy" @click="chooseAndImport">
+          <button
+            v-if="selectedTab === 'accounts'"
+            :disabled="busy || isOperationActive('accounts:import')"
+            @click="chooseAndImport"
+          >
             <svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true">
               <path d="M12 3v12" />
               <path d="m7 10 5 5 5-5" />
@@ -220,7 +242,11 @@ onMounted(async () => {
             </svg>
             <span>批量导入</span>
           </button>
-          <button v-if="selectedTab === 'accounts'" :disabled="busy" @click="startOAuthLogin">
+          <button
+            v-if="selectedTab === 'accounts'"
+            :disabled="busy || isOperationActive('oauth:start')"
+            @click="startOAuthLogin"
+          >
             <svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true">
               <path d="M15 7h1a5 5 0 0 1 0 10h-1" />
               <path d="M9 17H8A5 5 0 0 1 8 7h1" />
@@ -228,7 +254,11 @@ onMounted(async () => {
             </svg>
             <span>OAuth 登录</span>
           </button>
-          <button v-if="selectedTab === 'backups'" :disabled="busy" @click="createBackup">
+          <button
+            v-if="selectedTab === 'backups'"
+            :disabled="busy || isOperationActive('backup:create')"
+            @click="createBackup"
+          >
             <svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true">
               <path d="M12 3v12" />
               <path d="m17 10-5 5-5-5" />
@@ -249,6 +279,8 @@ onMounted(async () => {
         :filtered-accounts="filteredAccounts"
         :current="current"
         :busy="busy"
+        :is-operation-active="isOperationActive"
+        :has-active-operation="hasActiveOperation"
         @switch-account="switchAccount"
         @refresh-tokens="refreshTokens"
         @select-quota-account="selectQuotaAccount"
@@ -261,7 +293,9 @@ onMounted(async () => {
         :selected-quota-account="selectedQuotaAccount"
         :current="current"
         :busy="busy"
-        @refresh-all="refreshAll"
+        :is-operation-active="isOperationActive"
+        :has-active-operation="hasActiveOperation"
+        @refresh-all="refreshAllWithBusy"
         @fetch-usage="fetchUsage"
         @refresh-tokens="refreshTokens"
         @clear-usage="clearUsage"
@@ -271,13 +305,15 @@ onMounted(async () => {
         v-else-if="selectedTab === 'backups'"
         :backups="backups"
         :busy="busy"
+        :is-operation-active="isOperationActive"
+        :has-active-operation="hasActiveOperation"
         @restore-backup="restoreBackup"
       />
 
       <SettingsView
         v-else
         :settings="settings"
-        :busy="busy"
+        :busy="busy || isOperationActive('settings:save')"
         :update-checking="updateChecking"
         :update-downloading="updateDownloading"
         :update-policy-source="updatePolicySource"

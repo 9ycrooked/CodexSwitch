@@ -19,6 +19,8 @@ defineProps<{
   selectedQuotaAccount: AccountSummary | null;
   current: CodexState | null;
   busy: boolean;
+  isOperationActive: (key: string) => boolean;
+  hasActiveOperation: boolean;
 }>();
 
 defineEmits<{
@@ -39,7 +41,12 @@ defineEmits<{
       </div>
       <div class="actions">
         <button class="secondary" :disabled="busy" @click="$emit('refreshAll')">刷新列表</button>
-        <button :disabled="busy || !selectedQuotaAccount" @click="$emit('fetchUsage', selectedQuotaAccount)">检查额度</button>
+        <button
+          :disabled="busy || !selectedQuotaAccount || isOperationActive('quota:' + selectedQuotaAccount.id)"
+          @click="$emit('fetchUsage', selectedQuotaAccount)"
+        >
+          检查额度
+        </button>
       </div>
     </div>
 
@@ -119,11 +126,19 @@ defineEmits<{
         </div>
 
         <div class="quota-card-actions">
-          <button class="secondary" :disabled="busy" @click.stop="$emit('refreshTokens', account)">刷新 token</button>
-          <button :disabled="busy" @click.stop="$emit('fetchUsage', account)">检查额度</button>
           <button
             class="secondary"
-            :disabled="busy || !account.usage_state"
+            :disabled="busy || isOperationActive('refresh-token:' + account.id)"
+            @click.stop="$emit('refreshTokens', account)"
+          >
+            刷新 token
+          </button>
+          <button :disabled="busy || isOperationActive('quota:' + account.id)" @click.stop="$emit('fetchUsage', account)">
+            检查额度
+          </button>
+          <button
+            class="secondary"
+            :disabled="busy || !account.usage_state || isOperationActive('quota:' + account.id)"
             @click.stop="$emit('clearUsage', account)"
           >
             清除记录
