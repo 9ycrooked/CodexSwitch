@@ -1,4 +1,4 @@
-import { computed, reactive, ref } from "vue";
+import { computed, markRaw, reactive, ref, shallowRef } from "vue";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import type { Settings, UpdatePolicy } from "../types";
@@ -25,7 +25,7 @@ export function useUpdater(settings: Settings, setMessage: (message: string, isE
   const updateChecking = ref(false);
   const updateDownloading = ref(false);
   const updateError = ref("");
-  const pendingUpdate = ref<Update | null>(null);
+  const pendingUpdate = shallowRef<Update | null>(null);
   const updateDownloadedBytes = ref(0);
   const updateTotalBytes = ref(0);
 
@@ -88,7 +88,7 @@ export function useUpdater(settings: Settings, setMessage: (message: string, isE
         return;
       }
 
-      pendingUpdate.value = update;
+      pendingUpdate.value = markRaw(update);
       updateDialogOpen.value = true;
       if (manual) setMessage("");
     } catch (err) {
