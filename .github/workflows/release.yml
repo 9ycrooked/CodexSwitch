@@ -8,6 +8,9 @@ on:
 permissions:
   contents: write
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   build-windows:
     runs-on: windows-latest
@@ -37,6 +40,24 @@ jobs:
       - name: Install frontend dependencies
         run: yarn install --immutable
 
+      - name: Load release notes
+        id: release_notes
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $notesPath = ".github/release-notes/$tag.md"
+          if (-not (Test-Path -LiteralPath $notesPath)) {
+            $notesPath = ".github/release-notes/default.md"
+          }
+          if (-not (Test-Path -LiteralPath $notesPath)) {
+            throw "Release notes file not found for $tag and default.md is missing."
+          }
+
+          $body = Get-Content -LiteralPath $notesPath -Raw
+          "body<<__CODEX_SWITCH_RELEASE_NOTES__" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          $body | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "__CODEX_SWITCH_RELEASE_NOTES__" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
         env:
@@ -46,13 +67,7 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "Codex Switch ${{ github.ref_name }}"
-          releaseBody: |
-            ## 更新内容
-            - 请在发布前编辑这段 Release 正文。
-
-            ## 注意事项
-            - 发布后，Codex Switch 的更新弹窗会显示这里的内容。
-            - 启动检查和强制更新策略由本 Release 的 update-policy.json 控制。
+          releaseBody: ${{ steps.release_notes.outputs.body }}
           releaseDraft: true
           prerelease: false
 
