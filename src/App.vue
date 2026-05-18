@@ -3,6 +3,8 @@ import { computed, onMounted, reactive, ref } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open } from "@tauri-apps/plugin-dialog";
+import { relaunch } from "@tauri-apps/plugin-process";
+import { check, type Update } from "@tauri-apps/plugin-updater";
 import { Minus, Square, X } from "lucide-vue-next";
 
 type AccountSummary = {
@@ -71,6 +73,21 @@ type Settings = {
   oauth_callback_port: number;
   keep_login_profiles: boolean;
   oauth_login_mode: string;
+  check_updates_on_startup: boolean;
+  force_update_on_startup: boolean;
+};
+
+type UpdatePolicy = {
+  check_updates_on_startup: boolean;
+  force_update_on_startup: boolean;
+  message?: string | null;
+};
+
+type UpdateInfo = Update & {
+  body?: string;
+  notes?: string;
+  version?: string;
+  currentVersion?: string;
 };
 
 type CodexState = {
@@ -87,6 +104,8 @@ type SwitchResult = {
   backup_id: string;
   warnings: string[];
 };
+
+const UPDATE_POLICY_URL = "https://github.com/9ycrooked/CodexSwitch/releases/latest/download/update-policy.json";
 
 const accounts = ref<AccountSummary[]>([]);
 const backups = ref<BackupSummary[]>([]);
@@ -106,8 +125,25 @@ const settings = reactive<Settings>({
   browser_profile_dir: "",
   oauth_callback_port: 1455,
   keep_login_profiles: true,
-  oauth_login_mode: "external"
+  oauth_login_mode: "external",
+  check_updates_on_startup: true,
+  force_update_on_startup: false
 });
+
+const updatePolicy = reactive<UpdatePolicy>({
+  check_updates_on_startup: true,
+  force_update_on_startup: false,
+  message: null
+});
+const updatePolicySource = ref("默认策略");
+const updatePolicyError = ref("");
+const updateDialogOpen = ref(false);
+const updateChecking = ref(false);
+const updateDownloading = ref(false);
+const updateError = ref("");
+const pendingUpdate = ref<Update | null>(null);
+const updateDownloadedBytes = ref(0);
+const updateTotalBytes = ref(0);
 
 const filteredAccounts = computed(() => {
   const needle = query.value.trim().toLowerCase();
@@ -124,6 +160,19 @@ const selectedQuotaAccount = computed(() => {
 });
 
 const selectedUsageState = computed(() => selectedQuotaAccount.value?.usage_state || null);
+
+const pendingUpdateInfo = computed(() => pendingUpdate.value as UpdateInfo | null);
+
+const pendingUpdateNotes = computed(() => {
+  return pendingUpdateInfo.value?.body || pendingUpdateInfo.value?.notes || "这个版本没有填写更新说明。";
+});
+
+const updateProgressPercent = computed(() => {
+  if (!updateTotalBytes.value) return 0;
+  return Math.min(100, Math.round((updateDownloadedBytes.value / updateTotalBytes.value) * 100));
+});
+
+const updateIsForced = computed(() => Boolean(updatePolicy.force_update_on_startup && pendingUpdate.value));
 
 function formatDate(value?: string | null) {
   if (!value) return "未知";
@@ -256,6 +305,106 @@ function accountStatusClass(account: AccountSummary) {
 function setMessage(message: string, isError = false) {
   notice.value = isError ? "" : message;
   error.value = isError ? message : "";
+}
+
+function formatError(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function toBoolean(value: unknown, fallback: boolean) {
+  return typeof value === "boolean" ? value : fallback;
+}
+
+async function loadUpdatePolicy(): Promise<UpdatePolicy> {
+  const fallback: UpdatePolicy = {
+    check_updates_on_startup: settings.check_updates_on_startup ?? true,
+    force_update_on_startup: settings.force_update_on_startup ?? false,
+    message: null
+  };
+
+  try {
+    const response = await fetch(UPDATE_POLICY_URL, { cache: "no-store" });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+    const remote = (await response.json()) as Partial<UpdatePolicy>;
+    const nextPolicy = {
+      check_updates_on_startup: toBoolean(remote.check_updates_on_startup, fallback.check_updates_on_startup),
+      force_update_on_startup: toBoolean(remote.force_update_on_startup, fallback.force_update_on_startup),
+      message: typeof remote.message === "string" ? remote.message : null
+    };
+
+    Object.assign(updatePolicy, nextPolicy);
+    updatePolicySource.value = "远程发布配置";
+    updatePolicyError.value = "";
+    return nextPolicy;
+  } catch (err) {
+    Object.assign(updatePolicy, fallback);
+    updatePolicySource.value = "默认策略";
+    updatePolicyError.value = `发布配置读取失败，已使用默认策略：${formatError(err)}`;
+    return fallback;
+  }
+}
+
+async function runUpdateCheck(options: { manual?: boolean } = {}) {
+  const manual = Boolean(options.manual);
+  const policy = await loadUpdatePolicy();
+  if (!manual && !policy.check_updates_on_startup) return;
+
+  updateChecking.value = true;
+  updateError.value = "";
+
+  try {
+    const update = await check();
+    if (!update) {
+      if (manual) setMessage("当前已经是最新版本。");
+      return;
+    }
+
+    pendingUpdate.value = update;
+    updateDialogOpen.value = true;
+    if (manual) setMessage("");
+  } catch (err) {
+    const message = `更新检查失败：${formatError(err)}`;
+    updateError.value = message;
+    if (manual) setMessage(message, true);
+  } finally {
+    updateChecking.value = false;
+  }
+}
+
+async function checkForUpdatesManually() {
+  await runUpdateCheck({ manual: true });
+}
+
+async function installPendingUpdate() {
+  if (!pendingUpdate.value) return;
+
+  updateDownloading.value = true;
+  updateError.value = "";
+  updateDownloadedBytes.value = 0;
+  updateTotalBytes.value = 0;
+
+  try {
+    await pendingUpdate.value.downloadAndInstall((event) => {
+      if (event.event === "Started") {
+        updateTotalBytes.value = event.data.contentLength ?? 0;
+      }
+      if (event.event === "Progress") {
+        updateDownloadedBytes.value += event.data.chunkLength;
+      }
+    });
+
+    await relaunch();
+  } catch (err) {
+    updateError.value = `更新安装失败：${formatError(err)}`;
+  } finally {
+    updateDownloading.value = false;
+  }
+}
+
+function dismissUpdateDialog() {
+  if (updateIsForced.value) return;
+  updateDialogOpen.value = false;
 }
 
 async function minimizeWindow() {
@@ -479,7 +628,9 @@ async function saveSettings() {
         browser_profile_dir: settings.browser_profile_dir,
         oauth_callback_port: Number(settings.oauth_callback_port),
         keep_login_profiles: Boolean(settings.keep_login_profiles),
-        oauth_login_mode: settings.oauth_login_mode
+        oauth_login_mode: settings.oauth_login_mode,
+        check_updates_on_startup: settings.check_updates_on_startup,
+        force_update_on_startup: settings.force_update_on_startup
       }
     });
     Object.assign(settings, saved);
@@ -499,6 +650,7 @@ onMounted(async () => {
     if (!selectedQuotaAccountId.value && accounts.value[0]) {
       selectedQuotaAccountId.value = accounts.value[0].id;
     }
+    void runUpdateCheck();
   } catch (err) {
     setMessage(String(err), true);
   } finally {
@@ -866,11 +1018,91 @@ onMounted(async () => {
           <input v-model="settings.keep_login_profiles" type="checkbox" />
           <span>保留登录 Profile，用于隔离并复用该账号的浏览器会话</span>
         </label>
+        <section class="update-settings-panel">
+          <div>
+            <span class="eyebrow">Updater</span>
+            <h3>更新检查</h3>
+            <p>
+              启动检查和强制更新策略由发布包里的 update-policy.json 控制。默认策略为启动时检查更新，发现新版本时询问是否更新。
+            </p>
+            <small>当前策略：{{ updatePolicySource }}</small>
+            <small v-if="updatePolicyError">{{ updatePolicyError }}</small>
+          </div>
+          <button class="secondary" :disabled="busy || updateChecking || updateDownloading" @click="checkForUpdatesManually">
+            {{ updateChecking ? "检查中" : "检查更新" }}
+          </button>
+        </section>
         <div class="warning">
           当前版本按你的要求使用明文保存账号凭据。WebView2 Profile 只是隔离 cookie/cache/localStorage，不伪造设备指纹；账号库包含 refresh token，请不要共享应用数据目录或导出的账号文件。
         </div>
         <button :disabled="busy" @click="saveSettings">保存设置</button>
       </section>
     </section>
+
+    <div v-if="updateDialogOpen" class="modal-backdrop">
+      <section class="modal update-modal" role="dialog" aria-modal="true" aria-labelledby="update-modal-title">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">软件更新</p>
+            <h2 id="update-modal-title">发现新版本</h2>
+          </div>
+          <button
+            v-if="!updateIsForced"
+            class="modal-close"
+            type="button"
+            aria-label="关闭更新提示"
+            :disabled="updateDownloading"
+            @click="dismissUpdateDialog"
+          >
+            ×
+          </button>
+        </div>
+
+        <p v-if="updatePolicy.message" class="update-policy-message">{{ updatePolicy.message }}</p>
+
+        <div v-if="pendingUpdateInfo" class="update-version-row">
+          <span>当前版本 {{ pendingUpdateInfo.currentVersion || "未知" }}</span>
+          <span>新版本 {{ pendingUpdateInfo.version || "未知" }}</span>
+        </div>
+
+        <pre class="update-notes">{{ pendingUpdateNotes }}</pre>
+
+        <div v-if="updateDownloading" class="update-progress">
+          <div class="quota-bar" aria-hidden="true">
+            <div
+              class="quota-bar-fill quota-bar-fill-high"
+              :style="{ width: updateTotalBytes ? `${updateProgressPercent}%` : '35%' }"
+            ></div>
+          </div>
+          <p>{{ updateTotalBytes ? `${updateProgressPercent}%` : "正在下载更新..." }}</p>
+        </div>
+
+        <p v-if="updateError" class="notice error">{{ updateError }}</p>
+
+        <div class="modal-actions">
+          <button
+            v-if="!updateIsForced"
+            class="secondary"
+            type="button"
+            :disabled="updateDownloading"
+            @click="dismissUpdateDialog"
+          >
+            稍后
+          </button>
+          <button
+            v-else
+            class="secondary"
+            type="button"
+            :disabled="updateDownloading"
+            @click="closeWindow"
+          >
+            退出
+          </button>
+          <button type="button" :disabled="updateDownloading || !pendingUpdate" @click="installPendingUpdate">
+            {{ updateDownloading ? "正在更新" : "立即更新" }}
+          </button>
+        </div>
+      </section>
+    </div>
   </main>
 </template>
