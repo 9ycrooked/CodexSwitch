@@ -7,7 +7,6 @@ use std::fs;
 use std::io::{Read, Write};
 use std::net::TcpListener;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc, Mutex, OnceLock,
@@ -323,7 +322,8 @@ fn open_oauth_external(app: &AppHandle, auth_url: &str, profile_dir: &Path) -> A
         .map(PathBuf::from)
         .find(|path| path.exists())
     {
-        Command::new(browser)
+        let browser = browser.to_string_lossy();
+        crate::process::hidden_command(browser.as_ref())
             .arg(format!("--user-data-dir={}", profile_dir.to_string_lossy()))
             .arg("--new-window")
             .arg(format!("--window-size={width},{height}"))
@@ -332,7 +332,7 @@ fn open_oauth_external(app: &AppHandle, auth_url: &str, profile_dir: &Path) -> A
             .map_err(stringify_io)?;
         return Ok(());
     }
-    Command::new("rundll32")
+    crate::process::hidden_command("rundll32")
         .args(["url.dll,FileProtocolHandler", auth_url])
         .spawn()
         .map_err(stringify_io)?;

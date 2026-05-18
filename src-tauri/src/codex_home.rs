@@ -2,7 +2,6 @@ use chrono::{DateTime, Utc};
 use serde_json::Value;
 use std::fs;
 use std::path::PathBuf;
-use std::process::Command;
 use std::thread;
 use std::time::Duration;
 
@@ -42,7 +41,9 @@ pub fn read_current_codex_state() -> AppResult<CodexState> {
 
 pub fn close_codex_processes(settings: &Settings, warnings: &mut Vec<String>) {
     for name in &settings.process_names {
-        let gentle = Command::new("taskkill").args(["/IM", name, "/T"]).output();
+        let gentle = crate::process::hidden_command("taskkill")
+            .args(["/IM", name, "/T"])
+            .output();
         if let Err(err) = gentle {
             warnings.push(format!("无法请求关闭 {name}：{err}"));
             continue;
@@ -52,7 +53,7 @@ pub fn close_codex_processes(settings: &Settings, warnings: &mut Vec<String>) {
     thread::sleep(Duration::from_millis(settings.close_timeout_ms));
 
     for name in &settings.process_names {
-        let forced = Command::new("taskkill")
+        let forced = crate::process::hidden_command("taskkill")
             .args(["/IM", name, "/T", "/F"])
             .output();
         if let Ok(output) = forced {
