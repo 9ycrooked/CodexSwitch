@@ -10,6 +10,30 @@ use crate::error::AppResult;
 use crate::models::{AccountSummary, CodexState};
 use crate::settings::{load_settings, Settings};
 
+fn is_process_running(name: &str) -> bool {
+    let output = crate::process::hidden_command("tasklist")
+        .args(["/FI", &format!("IMAGENAME eq {name}"), "/FO", "CSV", "/NH"])
+        .output();
+
+    let Ok(output) = output else {
+        return false;
+    };
+
+    let text = String::from_utf8_lossy(&output.stdout);
+    text.to_ascii_lowercase()
+        .contains(&name.to_ascii_lowercase())
+}
+
+fn wait_until_processes_exit(process_names: &[String], timeout_ms: u64) {
+    let deadline = std::time::Instant::now() + Duration::from_millis(timeout_ms);
+    while std::time::Instant::now() < deadline {
+        if process_names.iter().all(|name| !is_process_running(name)) {
+            return;
+        }
+        thread::sleep(Duration::from_millis(150));
+    }
+}
+
 #[tauri::command]
 pub fn read_current_codex_state() -> AppResult<CodexState> {
     let settings = load_settings()?;
@@ -50,7 +74,7 @@ pub fn close_codex_processes(settings: &Settings, warnings: &mut Vec<String>) {
         }
     }
 
-    thread::sleep(Duration::from_millis(settings.close_timeout_ms));
+    wait_until_processes_exit(&settings.process_names, settings.close_timeout_ms);
 
     for name in &settings.process_names {
         let forced = crate::process::hidden_command("taskkill")
