@@ -16,5 +16,5 @@ pub fn settings_path() -> AppResult<PathBuf> {
 pub fn account_dir(id: &str) -> AppResult<PathBuf> {
     Ok(app_store_dir()?
         .join("accounts")
-        .join(crate::sanitize_id(id)))
+        .join(crate::accounts::sanitize_id(id)))
 }
