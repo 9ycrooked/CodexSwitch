@@ -315,7 +315,8 @@ pub(crate) fn auth_json_from_token_response(token: &TokenResponse) -> Value {
     })
 }
 
-pub(crate) fn list_accounts() -> AppResult<Vec<AccountSummary>> {
+#[tauri::command]
+pub fn list_accounts() -> AppResult<Vec<AccountSummary>> {
     let accounts_dir = app_store_dir()?.join("accounts");
     if !accounts_dir.exists() {
         return Ok(Vec::new());
