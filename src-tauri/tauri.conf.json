@@ -1,0 +1,32 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Codex Switch",
+  "version": "0.1.0",
+  "identifier": "local.codex.account-switcher",
+  "build": {
+    "beforeDevCommand": "yarn dev",
+    "devUrl": "http://127.0.0.1:1420",
+    "beforeBuildCommand": "yarn build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Codex Switch",
+        "decorations": false,
+        "width": 1120,
+        "height": 760,
+        "minWidth": 860,
+        "minHeight": 620
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": []
+  }
+}
