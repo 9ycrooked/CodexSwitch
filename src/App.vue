@@ -1,108 +1,35 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from "vue";
-import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open } from "@tauri-apps/plugin-dialog";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import { Minus, Square, X } from "lucide-vue-next";
-
-type AccountSummary = {
-  id: string;
-  display_name: string;
-  email?: string | null;
-  account_id?: string | null;
-  plan?: string | null;
-  expired?: string | null;
-  disabled: boolean;
-  imported_at: string;
-  has_config: boolean;
-  browser_profile_dir?: string | null;
-  oauth_metadata?: OAuthMetadata | null;
-  quota_state?: QuotaState | null;
-  usage_state?: UsageState | null;
-};
-
-type OAuthMetadata = {
-  email?: string | null;
-  account_id?: string | null;
-  plan_type?: string | null;
-  subscription_until?: string | null;
-};
-
-type QuotaState = {
-  status: string;
-  last_checked_at?: string | null;
-  last_error?: string | null;
-  resets_at?: string | null;
-  resets_in_seconds?: number | null;
-  model?: string | null;
-};
-
-type UsageState = {
-  status: string;
-  last_checked_at?: string | null;
-  last_error?: string | null;
-  http_status?: number | null;
-  resets_at?: string | null;
-  raw_plan_type?: string | null;
-  windows: CodexQuotaWindow[];
-};
-
-type CodexQuotaWindow = {
-  id: string;
-  label: string;
-  used_percent?: number | null;
-  reset_at?: string | null;
-  reset_label: string;
-  limit_reached: boolean;
-};
-
-type BackupSummary = {
-  id: string;
-  created_at: string;
-  auth_path?: string | null;
-  config_path?: string | null;
-};
-
-type Settings = {
-  codex_home: string;
-  process_names: string[];
-  close_timeout_ms: number;
-  browser_profile_dir: string;
-  oauth_callback_port: number;
-  keep_login_profiles: boolean;
-  oauth_login_mode: string;
-  check_updates_on_startup: boolean;
-  force_update_on_startup: boolean;
-};
-
-type UpdatePolicy = {
-  check_updates_on_startup: boolean;
-  force_update_on_startup: boolean;
-  message?: string | null;
-};
+import type { AccountSummary, BackupSummary, CodexState, Settings, UpdatePolicy } from "./types";
+import * as api from "./api/codexSwitchApi";
+import {
+  accountStatusClass,
+  accountStatusLabel,
+  formatDate,
+  formatError,
+  isCurrentAccount,
+  quotaClass,
+  quotaLabel,
+  quotaTimestamp,
+  usageClass,
+  usageLabel,
+  usagePercentLabel,
+  usageResetLabel,
+  usageWindowClass,
+  usageWindowPercentClass,
+  usageWindowWidth
+} from "./utils/format";
 
 type UpdateInfo = Update & {
   body?: string;
   notes?: string;
   version?: string;
   currentVersion?: string;
-};
-
-type CodexState = {
-  codex_home: string;
-  auth_exists: boolean;
-  config_exists: boolean;
-  current_account_id?: string | null;
-  current_email?: string | null;
-  current_auth_mode?: string | null;
-};
-
-type SwitchResult = {
-  account: AccountSummary;
-  backup_id: string;
-  warnings: string[];
 };
 
 const UPDATE_POLICY_URL = "https://github.com/9ycrooked/CodexSwitch/releases/latest/download/update-policy.json";
@@ -174,141 +101,13 @@ const updateProgressPercent = computed(() => {
 
 const updateIsForced = computed(() => Boolean(updatePolicy.force_update_on_startup && pendingUpdate.value));
 
-function formatDate(value?: string | null) {
-  if (!value) return "未知";
-  const date = new Date(value);
-  if (Number.isNaN(date.valueOf())) return value;
-  return date.toLocaleString();
-}
-
-function isCurrentAccount(account: AccountSummary) {
-  return Boolean(account.account_id && current.value?.current_account_id === account.account_id);
-}
-
 function updateProcessNames(event: Event) {
   settings.process_names = (event.target as HTMLInputElement).value.split(",");
-}
-
-function quotaLabel(state?: QuotaState | null) {
-  if (!state) return "未检查";
-  const labels: Record<string, string> = {
-    ok: "正常",
-    cooldown: "冷却中",
-    token_invalid: "认证失效",
-    check_failed: "检查失败"
-  };
-  return labels[state.status] || state.status;
-}
-
-function quotaClass(state?: QuotaState | null) {
-  if (!state) return "muted";
-  if (state.status === "ok") return "ok";
-  if (state.status === "cooldown") return "warn";
-  return "bad";
-}
-
-function quotaMeterClass(state?: QuotaState | null) {
-  const statusClass = quotaClass(state);
-  if (statusClass === "ok") return "quota-bar-fill quota-bar-fill-high";
-  if (statusClass === "warn") return "quota-bar-fill quota-bar-fill-medium";
-  if (statusClass === "bad") return "quota-bar-fill quota-bar-fill-low";
-  return "quota-bar-fill quota-bar-fill-muted";
-}
-
-function quotaMeterWidth(state?: QuotaState | null) {
-  if (!state) return "0%";
-  const widths: Record<string, string> = {
-    ok: "100%",
-    cooldown: "58%",
-    token_invalid: "28%",
-    check_failed: "36%"
-  };
-  return widths[state.status] || "24%";
-}
-
-function quotaTimestamp(state?: QuotaState | null) {
-  if (!state) return "未检查";
-  if (state.resets_at) return formatDate(state.resets_at);
-  if (state.last_checked_at) return formatDate(state.last_checked_at);
-  return "无时间记录";
-}
-
-function usageLabel(state?: UsageState | null) {
-  if (!state) return "未检查";
-  const labels: Record<string, string> = {
-    success: "已更新",
-    cooldown: "冷却中",
-    token_invalid: "认证失效",
-    check_failed: "检查失败"
-  };
-  return labels[state.status] || state.status;
-}
-
-function usageClass(state?: UsageState | null) {
-  if (!state) return "muted";
-  if (state.status === "success") return "ok";
-  if (state.status === "cooldown") return "warn";
-  return "bad";
-}
-
-function usageWindowWidth(window: CodexQuotaWindow) {
-  const value = Math.max(0, Math.min(100, Number(window.used_percent ?? 0)));
-  return `${value}%`;
-}
-
-function usageWindowClass(window: CodexQuotaWindow) {
-  const value = Number(window.used_percent ?? 0);
-  const isWeeklyWindow = window.id.includes("weekly") || window.label.includes("周");
-  if (isWeeklyWindow && value < 100) return "quota-bar-fill quota-bar-fill-high";
-  if (window.limit_reached || value >= 100) return "quota-bar-fill quota-bar-fill-low";
-  if (value >= 90) return "quota-bar-fill quota-bar-fill-low";
-  if (value >= 70) return "quota-bar-fill quota-bar-fill-medium";
-  if (value > 0) return "quota-bar-fill quota-bar-fill-high";
-  return "quota-bar-fill quota-bar-fill-muted";
-}
-
-function usageWindowPercentClass(window: CodexQuotaWindow) {
-  const value = Number(window.used_percent ?? 0);
-  const isWeeklyWindow = window.id.includes("weekly") || window.label.includes("周");
-  if (isWeeklyWindow && value < 100) return "ok";
-  return window.limit_reached || value >= 100 ? "bad" : "ok";
-}
-
-function usagePercentLabel(window: CodexQuotaWindow) {
-  if (window.used_percent === null || window.used_percent === undefined) return "未知";
-  return `已用 ${Math.round(Number(window.used_percent))}%`;
-}
-
-function usageResetLabel(window: CodexQuotaWindow) {
-  return window.reset_at ? formatDate(window.reset_at) : window.reset_label || "-";
-}
-
-function accountStatusLabel(account: AccountSummary) {
-  if (isCurrentAccount(account)) return "当前";
-  if (account.disabled) return "禁用";
-  if (account.quota_state?.status === "cooldown") return "冷却";
-  if (account.quota_state?.status === "token_invalid") return "失效";
-  if (account.quota_state?.status === "check_failed") return "警告";
-  return "可用";
-}
-
-function accountStatusClass(account: AccountSummary) {
-  if (isCurrentAccount(account)) return "state-badge-active";
-  if (account.disabled) return "state-badge-disabled";
-  if (account.quota_state?.status === "cooldown") return "state-badge-warning";
-  if (account.quota_state?.status === "token_invalid" || account.quota_state?.status === "check_failed") {
-    return "state-badge-disabled";
-  }
-  return "state-badge-active";
 }
 
 function setMessage(message: string, isError = false) {
   notice.value = isError ? "" : message;
   error.value = isError ? message : "";
-}
-
-function formatError(error: unknown) {
-  return error instanceof Error ? error.message : String(error);
 }
 
 function toBoolean(value: unknown, fallback: boolean) {
@@ -431,10 +230,10 @@ async function handleTitlebarDoubleClick(event: MouseEvent) {
 
 async function refreshAll() {
   const [nextAccounts, nextBackups, nextCurrent, nextSettings] = await Promise.all([
-    invoke<AccountSummary[]>("list_accounts"),
-    invoke<BackupSummary[]>("list_backups"),
-    invoke<CodexState>("read_current_codex_state"),
-    invoke<Settings>("read_settings")
+    api.listAccounts(),
+    api.listBackups(),
+    api.readCurrentCodexState(),
+    api.readSettings()
   ]);
   accounts.value = nextAccounts;
   backups.value = nextBackups;
@@ -456,7 +255,7 @@ async function chooseAndImport() {
 
   busy.value = true;
   try {
-    const imported = await invoke<AccountSummary[]>("import_accounts", { paths });
+    const imported = await api.importAccounts(paths);
     await refreshAll();
     setMessage(`已导入 ${imported.length} 个账号。`);
   } catch (err) {
@@ -469,9 +268,7 @@ async function chooseAndImport() {
 async function startOAuthLogin() {
   busy.value = true;
   try {
-    const result = await invoke<{ auth_url: string; browser_profile_dir: string; mode: string }>("start_oauth_login", {
-      profileId: null
-    });
+    const result = await api.startOauthLogin();
     const modeText = result.mode === "embedded" ? "内置 WebView2" : "外部隔离浏览器";
     setMessage(`已打开 ${modeText} OAuth 登录。Profile: ${result.browser_profile_dir}`);
   } catch (err) {
@@ -484,7 +281,7 @@ async function startOAuthLogin() {
 async function closeOAuthLogin() {
   busy.value = true;
   try {
-    await invoke("close_oauth_login");
+    await api.closeOauthLogin();
     setMessage("已关闭等待中的 OAuth 登录窗口。");
   } catch (err) {
     setMessage(String(err), true);
@@ -496,7 +293,7 @@ async function closeOAuthLogin() {
 async function refreshTokens(account: AccountSummary) {
   busy.value = true;
   try {
-    const updated = await invoke<AccountSummary>("refresh_account_tokens", { accountId: account.id });
+    const updated = await api.refreshAccountTokens(account.id);
     await refreshAll();
     setMessage(`已刷新 ${updated.display_name} 的认证状态。`);
   } catch (err) {
@@ -511,10 +308,7 @@ async function checkQuota(account: AccountSummary) {
   if (!ok) return;
   busy.value = true;
   try {
-    const quota = await invoke<QuotaState>("check_account_quota", {
-      accountId: account.id,
-      model: account.plan?.includes("free") ? "gpt-5.5" : "gpt-5.5"
-    });
+    const quota = await api.checkAccountQuota(account.id, account.plan?.includes("free") ? "gpt-5.5" : "gpt-5.5");
     await refreshAll();
     setMessage(`额度状态：${quotaLabel(quota)}。`);
   } catch (err) {
@@ -538,7 +332,7 @@ async function fetchUsage(account?: AccountSummary | null) {
   }
   busy.value = true;
   try {
-    const state = await invoke<UsageState>("fetch_codex_usage", { accountId: target.id });
+    const state = await api.fetchCodexUsage(target.id);
     await refreshAll();
     selectedQuotaAccountId.value = target.id;
     setMessage(`额度状态：${usageLabel(state)}。`);
@@ -554,7 +348,7 @@ async function clearUsage(account?: AccountSummary | null) {
   if (!target) return;
   busy.value = true;
   try {
-    await invoke("clear_usage_state", { accountId: target.id });
+    await api.clearUsageState(target.id);
     await refreshAll();
     selectedQuotaAccountId.value = target.id;
     setMessage("已清除该账号的额度记录。");
@@ -574,7 +368,7 @@ async function switchAccount(account: AccountSummary) {
 
   busy.value = true;
   try {
-    const result = await invoke<SwitchResult>("switch_account", { accountId: account.id });
+    const result = await api.switchCodexAccount(account.id);
     await refreshAll();
     const warningText = result.warnings.length ? ` 警告：${result.warnings.join("；")}` : "";
     setMessage(`已切换到 ${result.account.display_name}，备份 ${result.backup_id} 已创建。${warningText}`);
@@ -588,7 +382,7 @@ async function switchAccount(account: AccountSummary) {
 async function createBackup() {
   busy.value = true;
   try {
-    const backup = await invoke<BackupSummary>("backup_current_state");
+    const backup = await api.backupCurrentState();
     await refreshAll();
     setMessage(`已创建备份 ${backup.id}。`);
   } catch (err) {
@@ -603,7 +397,7 @@ async function restoreBackup(backup: BackupSummary) {
   if (!ok) return;
   busy.value = true;
   try {
-    await invoke("restore_backup", { backupId: backup.id });
+    await api.restoreBackup(backup.id);
     await refreshAll();
     setMessage(`已恢复备份 ${backup.id}。`);
   } catch (err) {
@@ -620,18 +414,16 @@ async function saveSettings() {
       .flatMap((item) => item.split(","))
       .map((item) => item.trim())
       .filter(Boolean);
-    const saved = await invoke<Settings>("update_settings", {
-      settings: {
-        codex_home: settings.codex_home,
-        process_names: processNames,
-        close_timeout_ms: Number(settings.close_timeout_ms),
-        browser_profile_dir: settings.browser_profile_dir,
-        oauth_callback_port: Number(settings.oauth_callback_port),
-        keep_login_profiles: Boolean(settings.keep_login_profiles),
-        oauth_login_mode: settings.oauth_login_mode,
-        check_updates_on_startup: settings.check_updates_on_startup,
-        force_update_on_startup: settings.force_update_on_startup
-      }
+    const saved = await api.updateSettings({
+      codex_home: settings.codex_home,
+      process_names: processNames,
+      close_timeout_ms: Number(settings.close_timeout_ms),
+      browser_profile_dir: settings.browser_profile_dir,
+      oauth_callback_port: Number(settings.oauth_callback_port),
+      keep_login_profiles: Boolean(settings.keep_login_profiles),
+      oauth_login_mode: settings.oauth_login_mode,
+      check_updates_on_startup: settings.check_updates_on_startup,
+      force_update_on_startup: settings.force_update_on_startup
     });
     Object.assign(settings, saved);
     await refreshAll();
@@ -799,7 +591,7 @@ onMounted(async () => {
           <article
             v-for="account in filteredAccounts"
             :key="account.id"
-            :class="['account-card file-card', { current: isCurrentAccount(account), disabled: account.disabled }]"
+            :class="['account-card file-card', { current: isCurrentAccount(account, current), disabled: account.disabled }]"
           >
             <div class="file-card-layout">
               <div class="provider-avatar" aria-hidden="true">
@@ -811,8 +603,8 @@ onMounted(async () => {
                   <div class="card-header-content">
                     <div class="card-badge-row">
                       <span class="type-badge codex-type">Codex</span>
-                      <span :class="['state-badge', accountStatusClass(account)]">
-                        {{ accountStatusLabel(account) }}
+                      <span :class="['state-badge', accountStatusClass(account, current)]">
+                        {{ accountStatusLabel(account, current) }}
                       </span>
                     </div>
                     <h3 class="file-name">{{ account.display_name }}</h3>
@@ -856,7 +648,7 @@ onMounted(async () => {
                 </div>
 
                 <div class="card-actions">
-                  <button class="primary-action-button" :disabled="busy || isCurrentAccount(account)" @click="switchAccount(account)">
+                  <button class="primary-action-button" :disabled="busy || isCurrentAccount(account, current)" @click="switchAccount(account)">
                     切换
                   </button>
                   <button class="secondary" :disabled="busy" @click="refreshTokens(account)">刷新认证</button>
@@ -897,8 +689,8 @@ onMounted(async () => {
               <div class="quota-card-title">
                 <div class="card-badge-row">
                   <span class="type-badge codex-type">Codex</span>
-                  <span :class="['state-badge', accountStatusClass(account)]">
-                    {{ accountStatusLabel(account) }}
+                  <span :class="['state-badge', accountStatusClass(account, current)]">
+                    {{ accountStatusLabel(account, current) }}
                   </span>
                   <span :class="['quota-percent', usageClass(account.usage_state)]">
                     {{ usageLabel(account.usage_state) }}

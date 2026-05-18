@@ -1,0 +1,62 @@
+import { invoke } from "@tauri-apps/api/core";
+import type { AccountSummary, BackupSummary, CodexState, QuotaState, Settings, SwitchResult, UsageState } from "../types";
+
+export function listAccounts() {
+  return invoke<AccountSummary[]>("list_accounts");
+}
+
+export function listBackups() {
+  return invoke<BackupSummary[]>("list_backups");
+}
+
+export function readCurrentCodexState() {
+  return invoke<CodexState>("read_current_codex_state");
+}
+
+export function readSettings() {
+  return invoke<Settings>("read_settings");
+}
+
+export function updateSettings(settings: Settings) {
+  return invoke<Settings>("update_settings", { settings });
+}
+
+export function importAccounts(paths: string[]) {
+  return invoke<AccountSummary[]>("import_accounts", { paths });
+}
+
+export function startOauthLogin(profileId: string | null = null) {
+  return invoke<{ auth_url: string; browser_profile_dir: string; mode: string }>("start_oauth_login", { profileId });
+}
+
+export function closeOauthLogin() {
+  return invoke("close_oauth_login");
+}
+
+export function refreshAccountTokens(accountId: string) {
+  return invoke<AccountSummary>("refresh_account_tokens", { accountId });
+}
+
+export function checkAccountQuota(accountId: string, model = "gpt-5.5") {
+  return invoke<QuotaState>("check_account_quota", { accountId, model });
+}
+
+export function fetchCodexUsage(accountId: string) {
+  return invoke<UsageState>("fetch_codex_usage", { accountId });
+}
+
+export function clearUsageState(accountId: string) {
+  return invoke("clear_usage_state", { accountId });
+}
+
+export function switchCodexAccount(accountId: string) {
+  return invoke<SwitchResult>("switch_account", { accountId });
+}
+
+export function backupCurrentState() {
+  return invoke<BackupSummary>("backup_current_state");
+}
+
+export function restoreBackup(backupId: string) {
+  return invoke("restore_backup", { backupId });
+}
