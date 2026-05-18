@@ -1,0 +1,141 @@
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--bg-secondary);
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  font-size: var(--font-size-base);
+  background:
+    radial-gradient(circle at 16% 0%, color-mix(in srgb, var(--primary-color) 13%, transparent), transparent 34rem),
+    var(--bg-secondary);
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 40px;
+  border: 1px solid var(--primary-color);
+  border-radius: var(--radius-md);
+  padding: 9px 12px;
+  color: var(--primary-contrast);
+  background-color: var(--primary-color);
+  cursor: pointer;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  transition:
+    transform var(--transition-fast),
+    box-shadow var(--transition-fast),
+    border-color var(--transition-fast),
+    background-color var(--transition-fast),
+    color var(--transition-fast),
+    opacity var(--transition-fast);
+}
+
+button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: var(--primary-hover);
+  background-color: var(--primary-hover);
+}
+
+button:active:not(:disabled) {
+  transform: translateY(0);
+  border-color: var(--primary-active);
+  background-color: var(--primary-active);
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(139, 134, 128, 0.22);
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+button.secondary {
+  border-color: var(--border-color);
+  color: var(--text-primary);
+  background-color: var(--bg-tertiary);
+}
+
+button.secondary:hover:not(:disabled) {
+  border-color: var(--border-hover);
+  background-color: var(--bg-hover);
+}
+
+.button-icon,
+.nav-icon {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+input,
+select {
+  width: 100%;
+  min-height: 40px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 9px 11px;
+  color: var(--text-primary);
+  background-color: var(--bg-secondary);
+  transition:
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast),
+    background-color var(--transition-fast);
+}
+
+input::placeholder {
+  color: var(--text-quaternary);
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+h1 {
+  color: var(--text-primary);
+  font-size: 16px;
+  line-height: 1.25;
+}
+
+h2 {
+  color: var(--text-primary);
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0;
+}
+
+h3 {
+  color: var(--text-primary);
+  font-size: 15px;
+  line-height: 1.35;
+}
