@@ -48,6 +48,10 @@ pub struct Settings {
     pub keep_login_profiles: bool,
     #[serde(default = "default_oauth_login_mode")]
     pub oauth_login_mode: String,
+    #[serde(default = "default_true")]
+    pub check_updates_on_startup: bool,
+    #[serde(default)]
+    pub force_update_on_startup: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -668,6 +672,8 @@ fn update_settings(settings: Settings) -> AppResult<Settings> {
         oauth_callback_port: settings.oauth_callback_port,
         keep_login_profiles: settings.keep_login_profiles,
         oauth_login_mode: sanitize_oauth_login_mode(&settings.oauth_login_mode),
+        check_updates_on_startup: settings.check_updates_on_startup,
+        force_update_on_startup: settings.force_update_on_startup,
     };
     atomic_write_json(&settings_path()?, &sanitized)?;
     Ok(sanitized)
@@ -1820,6 +1826,8 @@ fn default_settings() -> Settings {
         oauth_callback_port: default_oauth_callback_port(),
         keep_login_profiles: default_keep_login_profiles(),
         oauth_login_mode: default_oauth_login_mode(),
+        check_updates_on_startup: default_true(),
+        force_update_on_startup: false,
     }
 }
 
@@ -1857,6 +1865,10 @@ fn default_keep_login_profiles() -> bool {
 
 fn default_oauth_login_mode() -> String {
     "external".to_string()
+}
+
+fn default_true() -> bool {
+    true
 }
 
 fn sanitize_oauth_login_mode(value: &str) -> String {
@@ -2304,6 +2316,24 @@ command = "extra"
         let identity = current_identity_from_auth(&auth_json);
         assert!(identity.email.is_none());
         assert!(identity.account_id.is_none());
+    }
+
+    #[test]
+    fn settings_defaults_update_preferences_when_missing() {
+        let raw = r#"{
+            "codex_home": "C:\\Users\\Y\\.codex",
+            "process_names": ["Codex.exe"],
+            "close_timeout_ms": 3000,
+            "browser_profile_dir": "profiles",
+            "oauth_callback_port": 1455,
+            "keep_login_profiles": true,
+            "oauth_login_mode": "external"
+        }"#;
+
+        let settings: Settings = serde_json::from_str(raw).expect("settings should deserialize");
+
+        assert!(settings.check_updates_on_startup);
+        assert!(!settings.force_update_on_startup);
     }
 
     #[test]
