@@ -1,17 +1,17 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from "vue";
-import { getCurrentWindow } from "@tauri-apps/api/window";
-import { open } from "@tauri-apps/plugin-dialog";
-import { relaunch } from "@tauri-apps/plugin-process";
-import { check, type Update } from "@tauri-apps/plugin-updater";
 import { Minus, Square, X } from "lucide-vue-next";
-import type { AccountSummary, BackupSummary, CodexState, Settings, UpdatePolicy } from "./types";
+import type { AccountSummary, BackupSummary, CodexState, Settings } from "./types";
 import * as api from "./api/codexSwitchApi";
+import { useAccounts } from "./composables/useAccounts";
+import { useBackups } from "./composables/useBackups";
+import { useQuota } from "./composables/useQuota";
+import { useUpdater } from "./composables/useUpdater";
+import { useWindowControls } from "./composables/useWindowControls";
 import {
   accountStatusClass,
   accountStatusLabel,
   formatDate,
-  formatError,
   isCurrentAccount,
   quotaClass,
   quotaLabel,
@@ -25,15 +25,6 @@ import {
   usageWindowWidth
 } from "./utils/format";
 
-type UpdateInfo = Update & {
-  body?: string;
-  notes?: string;
-  version?: string;
-  currentVersion?: string;
-};
-
-const UPDATE_POLICY_URL = "https://github.com/9ycrooked/CodexSwitch/releases/latest/download/update-policy.json";
-
 const accounts = ref<AccountSummary[]>([]);
 const backups = ref<BackupSummary[]>([]);
 const current = ref<CodexState | null>(null);
@@ -42,8 +33,6 @@ const query = ref("");
 const busy = ref(false);
 const notice = ref("");
 const error = ref("");
-const selectedQuotaAccountId = ref("");
-const appWindow = getCurrentWindow();
 
 const settings = reactive<Settings>({
   codex_home: "C:\\Users\\Y\\.codex",
@@ -57,21 +46,6 @@ const settings = reactive<Settings>({
   force_update_on_startup: false
 });
 
-const updatePolicy = reactive<UpdatePolicy>({
-  check_updates_on_startup: true,
-  force_update_on_startup: false,
-  message: null
-});
-const updatePolicySource = ref("默认策略");
-const updatePolicyError = ref("");
-const updateDialogOpen = ref(false);
-const updateChecking = ref(false);
-const updateDownloading = ref(false);
-const updateError = ref("");
-const pendingUpdate = ref<Update | null>(null);
-const updateDownloadedBytes = ref(0);
-const updateTotalBytes = ref(0);
-
 const filteredAccounts = computed(() => {
   const needle = query.value.trim().toLowerCase();
   if (!needle) return accounts.value;
@@ -82,25 +56,6 @@ const filteredAccounts = computed(() => {
   });
 });
 
-const selectedQuotaAccount = computed(() => {
-  return accounts.value.find((account) => account.id === selectedQuotaAccountId.value) || accounts.value[0] || null;
-});
-
-const selectedUsageState = computed(() => selectedQuotaAccount.value?.usage_state || null);
-
-const pendingUpdateInfo = computed(() => pendingUpdate.value as UpdateInfo | null);
-
-const pendingUpdateNotes = computed(() => {
-  return pendingUpdateInfo.value?.body || pendingUpdateInfo.value?.notes || "这个版本没有填写更新说明。";
-});
-
-const updateProgressPercent = computed(() => {
-  if (!updateTotalBytes.value) return 0;
-  return Math.min(100, Math.round((updateDownloadedBytes.value / updateTotalBytes.value) * 100));
-});
-
-const updateIsForced = computed(() => Boolean(updatePolicy.force_update_on_startup && pendingUpdate.value));
-
 function updateProcessNames(event: Event) {
   settings.process_names = (event.target as HTMLInputElement).value.split(",");
 }
@@ -108,124 +63,6 @@ function updateProcessNames(event: Event) {
 function setMessage(message: string, isError = false) {
   notice.value = isError ? "" : message;
   error.value = isError ? message : "";
-}
-
-function toBoolean(value: unknown, fallback: boolean) {
-  return typeof value === "boolean" ? value : fallback;
-}
-
-async function loadUpdatePolicy(): Promise<UpdatePolicy> {
-  const fallback: UpdatePolicy = {
-    check_updates_on_startup: settings.check_updates_on_startup ?? true,
-    force_update_on_startup: settings.force_update_on_startup ?? false,
-    message: null
-  };
-
-  try {
-    const response = await fetch(UPDATE_POLICY_URL, { cache: "no-store" });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
-    const remote = (await response.json()) as Partial<UpdatePolicy>;
-    const nextPolicy = {
-      check_updates_on_startup: toBoolean(remote.check_updates_on_startup, fallback.check_updates_on_startup),
-      force_update_on_startup: toBoolean(remote.force_update_on_startup, fallback.force_update_on_startup),
-      message: typeof remote.message === "string" ? remote.message : null
-    };
-
-    Object.assign(updatePolicy, nextPolicy);
-    updatePolicySource.value = "远程发布配置";
-    updatePolicyError.value = "";
-    return nextPolicy;
-  } catch (err) {
-    Object.assign(updatePolicy, fallback);
-    updatePolicySource.value = "默认策略";
-    updatePolicyError.value = `发布配置读取失败，已使用默认策略：${formatError(err)}`;
-    return fallback;
-  }
-}
-
-async function runUpdateCheck(options: { manual?: boolean } = {}) {
-  const manual = Boolean(options.manual);
-  const policy = await loadUpdatePolicy();
-  if (!manual && !policy.check_updates_on_startup) return;
-
-  updateChecking.value = true;
-  updateError.value = "";
-
-  try {
-    const update = await check();
-    if (!update) {
-      if (manual) setMessage("当前已经是最新版本。");
-      return;
-    }
-
-    pendingUpdate.value = update;
-    updateDialogOpen.value = true;
-    if (manual) setMessage("");
-  } catch (err) {
-    const message = `更新检查失败：${formatError(err)}`;
-    updateError.value = message;
-    if (manual) setMessage(message, true);
-  } finally {
-    updateChecking.value = false;
-  }
-}
-
-async function checkForUpdatesManually() {
-  await runUpdateCheck({ manual: true });
-}
-
-async function installPendingUpdate() {
-  if (!pendingUpdate.value) return;
-
-  updateDownloading.value = true;
-  updateError.value = "";
-  updateDownloadedBytes.value = 0;
-  updateTotalBytes.value = 0;
-
-  try {
-    await pendingUpdate.value.downloadAndInstall((event) => {
-      if (event.event === "Started") {
-        updateTotalBytes.value = event.data.contentLength ?? 0;
-      }
-      if (event.event === "Progress") {
-        updateDownloadedBytes.value += event.data.chunkLength;
-      }
-    });
-
-    await relaunch();
-  } catch (err) {
-    updateError.value = `更新安装失败：${formatError(err)}`;
-  } finally {
-    updateDownloading.value = false;
-  }
-}
-
-function dismissUpdateDialog() {
-  if (updateIsForced.value) return;
-  updateDialogOpen.value = false;
-}
-
-async function minimizeWindow() {
-  await appWindow.minimize();
-}
-
-async function toggleMaximizeWindow() {
-  await appWindow.toggleMaximize();
-}
-
-async function closeWindow() {
-  await appWindow.close();
-}
-
-async function startWindowDrag(event: MouseEvent) {
-  if (event.button !== 0) return;
-  await appWindow.startDragging();
-}
-
-async function handleTitlebarDoubleClick(event: MouseEvent) {
-  if (event.button !== 0) return;
-  await appWindow.toggleMaximize();
 }
 
 async function refreshAll() {
@@ -241,170 +78,66 @@ async function refreshAll() {
   Object.assign(settings, nextSettings);
 }
 
-async function chooseAndImport() {
-  const selected = await open({
-    multiple: true,
-    filters: [
-      { name: "Codex account files", extensions: ["json", "toml"] },
-      { name: "JSON", extensions: ["json"] },
-      { name: "TOML", extensions: ["toml"] }
-    ]
-  });
-  const paths = Array.isArray(selected) ? selected : selected ? [selected] : [];
-  if (!paths.length) return;
+const {
+  minimizeWindow,
+  toggleMaximizeWindow,
+  closeWindow,
+  startWindowDrag,
+  handleTitlebarDoubleClick
+} = useWindowControls();
 
-  busy.value = true;
-  try {
-    const imported = await api.importAccounts(paths);
-    await refreshAll();
-    setMessage(`已导入 ${imported.length} 个账号。`);
-  } catch (err) {
-    setMessage(String(err), true);
-  } finally {
-    busy.value = false;
-  }
-}
+const {
+  updatePolicy,
+  updatePolicySource,
+  updatePolicyError,
+  updateDialogOpen,
+  updateChecking,
+  updateDownloading,
+  updateError,
+  pendingUpdate,
+  pendingUpdateInfo,
+  pendingUpdateNotes,
+  updateTotalBytes,
+  updateProgressPercent,
+  updateIsForced,
+  runUpdateCheck,
+  checkForUpdatesManually,
+  installPendingUpdate,
+  dismissUpdateDialog
+} = useUpdater(settings, setMessage);
 
-async function startOAuthLogin() {
-  busy.value = true;
-  try {
-    const result = await api.startOauthLogin();
-    const modeText = result.mode === "embedded" ? "内置 WebView2" : "外部隔离浏览器";
-    setMessage(`已打开 ${modeText} OAuth 登录。Profile: ${result.browser_profile_dir}`);
-  } catch (err) {
-    setMessage(String(err), true);
-  } finally {
-    busy.value = false;
-  }
-}
+const { chooseAndImport, startOAuthLogin, closeOAuthLogin, refreshTokens, switchAccount } = useAccounts({
+  accounts,
+  current,
+  busy,
+  refreshAll,
+  setMessage
+});
 
-async function closeOAuthLogin() {
-  busy.value = true;
-  try {
-    await api.closeOauthLogin();
-    setMessage("已关闭等待中的 OAuth 登录窗口。");
-  } catch (err) {
-    setMessage(String(err), true);
-  } finally {
-    busy.value = false;
-  }
-}
+const {
+  selectedQuotaAccountId,
+  selectedQuotaAccount,
+  selectedUsageState,
+  selectQuotaAccount: selectQuotaAccountBase,
+  fetchUsage,
+  clearUsage
+} = useQuota({
+  accounts,
+  busy,
+  refreshAll,
+  setMessage
+});
 
-async function refreshTokens(account: AccountSummary) {
-  busy.value = true;
-  try {
-    const updated = await api.refreshAccountTokens(account.id);
-    await refreshAll();
-    setMessage(`已刷新 ${updated.display_name} 的认证状态。`);
-  } catch (err) {
-    setMessage(String(err), true);
-  } finally {
-    busy.value = false;
-  }
-}
-
-async function checkQuota(account: AccountSummary) {
-  const ok = window.confirm("额度探测会向 Codex 发送一个最小请求，可能产生极少量用量。继续吗？");
-  if (!ok) return;
-  busy.value = true;
-  try {
-    const quota = await api.checkAccountQuota(account.id, account.plan?.includes("free") ? "gpt-5.5" : "gpt-5.5");
-    await refreshAll();
-    setMessage(`额度状态：${quotaLabel(quota)}。`);
-  } catch (err) {
-    setMessage(String(err), true);
-  } finally {
-    busy.value = false;
-  }
-}
+const { createBackup, restoreBackup } = useBackups({
+  backups,
+  busy,
+  refreshAll,
+  setMessage
+});
 
 function selectQuotaAccount(account?: AccountSummary | null) {
-  if (account) selectedQuotaAccountId.value = account.id;
-  if (!selectedQuotaAccountId.value && accounts.value[0]) selectedQuotaAccountId.value = accounts.value[0].id;
+  selectQuotaAccountBase(account);
   selectedTab.value = "quota";
-}
-
-async function fetchUsage(account?: AccountSummary | null) {
-  const target = account || selectedQuotaAccount.value;
-  if (!target) {
-    setMessage("请先选择一个账号。", true);
-    return;
-  }
-  busy.value = true;
-  try {
-    const state = await api.fetchCodexUsage(target.id);
-    await refreshAll();
-    selectedQuotaAccountId.value = target.id;
-    setMessage(`额度状态：${usageLabel(state)}。`);
-  } catch (err) {
-    setMessage(String(err), true);
-  } finally {
-    busy.value = false;
-  }
-}
-
-async function clearUsage(account?: AccountSummary | null) {
-  const target = account || selectedQuotaAccount.value;
-  if (!target) return;
-  busy.value = true;
-  try {
-    await api.clearUsageState(target.id);
-    await refreshAll();
-    selectedQuotaAccountId.value = target.id;
-    setMessage("已清除该账号的额度记录。");
-  } catch (err) {
-    setMessage(String(err), true);
-  } finally {
-    busy.value = false;
-  }
-}
-
-async function switchAccount(account: AccountSummary) {
-  const label = account.email || account.display_name || account.account_id || account.id;
-  const ok = window.confirm(
-    `将切换到 ${label}。\n\n应用会先关闭 Codex 桌面端，备份当前 auth.json/config.toml，然后写入目标账号。继续吗？`
-  );
-  if (!ok) return;
-
-  busy.value = true;
-  try {
-    const result = await api.switchCodexAccount(account.id);
-    await refreshAll();
-    const warningText = result.warnings.length ? ` 警告：${result.warnings.join("；")}` : "";
-    setMessage(`已切换到 ${result.account.display_name}，备份 ${result.backup_id} 已创建。${warningText}`);
-  } catch (err) {
-    setMessage(String(err), true);
-  } finally {
-    busy.value = false;
-  }
-}
-
-async function createBackup() {
-  busy.value = true;
-  try {
-    const backup = await api.backupCurrentState();
-    await refreshAll();
-    setMessage(`已创建备份 ${backup.id}。`);
-  } catch (err) {
-    setMessage(String(err), true);
-  } finally {
-    busy.value = false;
-  }
-}
-
-async function restoreBackup(backup: BackupSummary) {
-  const ok = window.confirm(`恢复备份 ${backup.id}？当前 auth.json/config.toml 会先被替换。`);
-  if (!ok) return;
-  busy.value = true;
-  try {
-    await api.restoreBackup(backup.id);
-    await refreshAll();
-    setMessage(`已恢复备份 ${backup.id}。`);
-  } catch (err) {
-    setMessage(String(err), true);
-  } finally {
-    busy.value = false;
-  }
 }
 
 async function saveSettings() {
