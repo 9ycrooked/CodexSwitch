@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { AccountSummary, BackupSummary, CodexState, QuotaState, Settings, SwitchResult, UsageState } from "../types";
+import type { AccountSummary, AppPaths, BackupSummary, CodexState, QuotaState, Settings, SwitchResult, UsageState } from "../types";
 
 export function listAccounts() {
   return invoke<AccountSummary[]>("list_accounts");
@@ -15,6 +15,30 @@ export function readCurrentCodexState() {
 
 export function readSettings() {
   return invoke<Settings>("read_settings");
+}
+
+export function readAppPaths() {
+  return invoke<AppPaths>("read_app_paths");
+}
+
+export function openCodexHomeDir() {
+  return invoke("open_codex_home_dir");
+}
+
+export function openAppStoreDir() {
+  return invoke("open_app_store_dir");
+}
+
+export function openBrowserProfileDir() {
+  return invoke("open_browser_profile_dir");
+}
+
+export function openBackupsDir() {
+  return invoke("open_backups_dir");
+}
+
+export function openBackupDir(backupId: string) {
+  return invoke("open_backup_dir", { backupId });
 }
 
 export function updateSettings(settings: Settings) {

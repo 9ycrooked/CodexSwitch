@@ -25,6 +25,7 @@ export function useUpdater(settings: Settings, setMessage: (message: string, isE
   const updateChecking = ref(false);
   const updateDownloading = ref(false);
   const updateError = ref("");
+  const lastUpdateCheckedAt = ref<string | null>(null);
   const pendingUpdate = shallowRef<Update | null>(null);
   const updateDownloadedBytes = ref(0);
   const updateTotalBytes = ref(0);
@@ -97,6 +98,7 @@ export function useUpdater(settings: Settings, setMessage: (message: string, isE
       if (manual) setMessage(message, true);
     } finally {
       updateChecking.value = false;
+      lastUpdateCheckedAt.value = new Date().toISOString();
     }
   }
 
@@ -139,6 +141,7 @@ export function useUpdater(settings: Settings, setMessage: (message: string, isE
     updateChecking,
     updateDownloading,
     updateError,
+    lastUpdateCheckedAt,
     pendingUpdate,
     pendingUpdateInfo,
     pendingUpdateNotes,

@@ -56,6 +56,13 @@ export type BackupSummary = {
   config_path?: string | null;
 };
 
+export type AppPaths = {
+  codex_home: string;
+  app_store_dir: string;
+  backups_dir: string;
+  browser_profile_dir: string;
+};
+
 export type Settings = {
   codex_home: string;
   process_names: string[];
