@@ -1,16 +1,30 @@
 import type { Ref } from "vue";
 import { open } from "@tauri-apps/plugin-dialog";
-import type { AccountSummary, CodexState } from "../types";
+import type { AccountSummary, CodexState, NetworkExitCheckResult, Settings } from "../types";
 import * as api from "../api/codexSwitchApi";
 import type { ToastType } from "./useNotifications";
 
 export function useAccounts(deps: {
   accounts: Ref<AccountSummary[]>;
   current: Ref<CodexState | null>;
+  settings: Settings;
   activeOperation: Ref<string>;
   refreshAll: () => Promise<void>;
   setMessage: (type: ToastType, message: string) => void;
 }) {
+  function summarizeNetworkCheck(result: NetworkExitCheckResult) {
+    const lines = [
+      `整体状态：${result.overall_status}`,
+      result.backend_country ? `后端出口国家：${result.backend_country}` : "",
+      result.backend_ip ? `后端出口 IP：${result.backend_ip}` : "",
+      result.auth_status != null ? `OAuth HTTP 状态：${result.auth_status}` : "",
+      result.errors.length ? `错误：${result.errors.join("；")}` : "",
+      result.warnings.length ? `警告：${result.warnings.join("；")}` : ""
+    ].filter(Boolean);
+
+    return lines.join("\n");
+  }
+
   async function runOperation(key: string, work: () => Promise<void>) {
     deps.activeOperation.value = key;
     try {
@@ -46,6 +60,19 @@ export function useAccounts(deps: {
   async function startOAuthLogin() {
     await runOperation("oauth:start", async () => {
       try {
+        if (deps.settings.check_oauth_network_on_login) {
+          const networkResult = await api.checkOauthNetworkExit(deps.settings.check_egress_region);
+          if (networkResult.overall_status !== "ok") {
+            const ok = window.confirm(
+              `登录前网络检查未通过。\n\n${summarizeNetworkCheck(networkResult)}\n\n这不会阻止登录，但 token exchange 可能失败。仍要继续 OAuth 登录吗？`
+            );
+            if (!ok) {
+              deps.setMessage("info", "OAuth 登录已取消");
+              return;
+            }
+          }
+        }
+
         const result = await api.startOauthLogin();
         const modeText = result.mode === "embedded" ? "内置 WebView2" : "外部隔离浏览器";
         deps.setMessage("info", `已打开 ${modeText} OAuth 登录 Profile: ${result.browser_profile_dir}`);

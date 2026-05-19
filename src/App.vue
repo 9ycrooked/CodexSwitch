@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { getVersion } from "@tauri-apps/api/app";
 import { computed, onMounted, reactive, ref } from "vue";
-import type { AccountSummary, AppPaths, BackupSummary, CodexState, Settings } from "./types";
+import type { AccountSummary, AppPaths, BackupSummary, CodexState, NetworkExitCheckResult, Settings } from "./types";
 import * as api from "./api/codexSwitchApi";
 import {
   openAppStoreDir,
@@ -37,6 +37,8 @@ const busy = ref(false);
 const activeOperation = ref("");
 const appVersion = ref("");
 const appPaths = ref<AppPaths | null>(null);
+const networkCheckResult = ref<NetworkExitCheckResult | null>(null);
+const networkCheckRunning = ref(false);
 
 const settings = reactive<Settings>({
   codex_home: "C:\\Users\\Y\\.codex",
@@ -139,6 +141,7 @@ const {
 const { chooseAndImport, startOAuthLogin, closeOAuthLogin, refreshTokens, switchAccount } = useAccounts({
   accounts,
   current,
+  settings,
   activeOperation,
   refreshAll,
   setMessage
@@ -211,6 +214,21 @@ async function saveSettings() {
     setMessage("error", String(err));
   } finally {
     if (activeOperation.value === operationKey) activeOperation.value = "";
+  }
+}
+
+async function checkNetworkExitManually() {
+  networkCheckRunning.value = true;
+  try {
+    const result = await api.checkOauthNetworkExit(settings.check_egress_region);
+    networkCheckResult.value = result;
+    const toastType: ToastType =
+      result.overall_status === "ok" ? "success" : result.overall_status === "warning" ? "warning" : "error";
+    setMessage(toastType, "登录前网络检查完成");
+  } catch (err) {
+    setMessage("error", String(err));
+  } finally {
+    networkCheckRunning.value = false;
   }
 }
 
@@ -374,8 +392,11 @@ onMounted(async () => {
         :update-downloading="updateDownloading"
         :update-policy-source="updatePolicySource"
         :update-policy-error="updatePolicyError"
+        :network-check-result="networkCheckResult"
+        :network-check-running="networkCheckRunning"
         @update-process-names="updateProcessNames"
         @check-for-updates="checkForUpdatesManually"
+        @check-network-exit="checkNetworkExitManually"
         @save-settings="saveSettings"
         @open-codex-home="openCodexHome"
         @open-app-data="openAppData"

@@ -1,5 +1,15 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { AccountSummary, AppPaths, BackupSummary, CodexState, QuotaState, Settings, SwitchResult, UsageState } from "../types";
+import type {
+  AccountSummary,
+  AppPaths,
+  BackupSummary,
+  CodexState,
+  NetworkExitCheckResult,
+  QuotaState,
+  Settings,
+  SwitchResult,
+  UsageState
+} from "../types";
 
 export function listAccounts() {
   return invoke<AccountSummary[]>("list_accounts");
@@ -51,6 +61,12 @@ export function importAccounts(paths: string[]) {
 
 export function startOauthLogin(profileId: string | null = null) {
   return invoke<{ auth_url: string; browser_profile_dir: string; mode: string }>("start_oauth_login", { profileId });
+}
+
+export function checkOauthNetworkExit(includeEgressRegion?: boolean) {
+  return invoke<NetworkExitCheckResult>("check_oauth_network_exit", {
+    includeEgressRegion: includeEgressRegion ?? null
+  });
 }
 
 export function closeOauthLogin() {

@@ -3,3 +3,67 @@
 @import "./styles/layout.css";
 @import "./styles/components.css";
 @import "./styles/views.css";
+
+.network-check-panel {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 11px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 13px;
+  background: var(--bg-tertiary);
+  animation: fade-in-up 260ms ease both;
+}
+
+.panel-heading-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  min-width: 0;
+}
+
+.panel-heading-row h3 {
+  font-size: 15px;
+}
+
+.panel-heading-row p {
+  margin-top: 5px;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.network-check-panel .checkbox-row {
+  grid-column: auto;
+  font-size: 13px;
+}
+
+.network-check-result {
+  display: grid;
+  gap: 8px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 70%, transparent);
+  border-radius: var(--radius-md);
+  padding: 10px;
+  background: color-mix(in srgb, var(--bg-secondary) 55%, transparent);
+}
+
+.network-check-result dl {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.network-check-result p,
+.network-check-result small {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.network-check-result small {
+  color: var(--text-tertiary);
+}

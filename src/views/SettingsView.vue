@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { AppPaths, Settings } from "../types";
+import type { AppPaths, NetworkExitCheckResult, Settings } from "../types";
 import { formatDate } from "../utils/format";
 
 defineProps<{
@@ -12,16 +12,26 @@ defineProps<{
   updateDownloading: boolean;
   updatePolicySource: string;
   updatePolicyError: string;
+  networkCheckResult: NetworkExitCheckResult | null;
+  networkCheckRunning: boolean;
 }>();
 
 defineEmits<{
   updateProcessNames: [Event];
   checkForUpdates: [];
+  checkNetworkExit: [];
   saveSettings: [];
   openCodexHome: [];
   openAppData: [];
   openProfiles: [];
 }>();
+
+function statusText(status: string) {
+  if (status === "ok") return "正常";
+  if (status === "warning") return "警告";
+  if (status === "failed") return "失败";
+  return status;
+}
 </script>
 
 <template>
@@ -75,6 +85,54 @@ defineEmits<{
         <option value="embedded">内置 WebView2（实验）</option>
       </select>
     </label>
+    <section class="network-check-panel">
+      <div class="panel-heading-row">
+        <div>
+          <h3>登录前网络检查</h3>
+          <p>检查软件后端是否能访问 OpenAI OAuth 服务；出口地区查询默认关闭。</p>
+        </div>
+        <button class="secondary" type="button" :disabled="busy || networkCheckRunning" @click="$emit('checkNetworkExit')">
+          {{ networkCheckRunning ? "检查中" : "立即检查" }}
+        </button>
+      </div>
+      <label class="checkbox-row">
+        <input v-model="settings.check_oauth_network_on_login" type="checkbox" />
+        <span>OAuth 登录前自动检查后端网络</span>
+      </label>
+      <label class="checkbox-row">
+        <input v-model="settings.check_egress_region" type="checkbox" />
+        <span>显示后端出口 IP 和国家代码（使用 Cloudflare trace）</span>
+      </label>
+      <div v-if="networkCheckResult" class="network-check-result">
+        <dl>
+          <div>
+            <dt>整体状态</dt>
+            <dd>{{ statusText(networkCheckResult.overall_status) }}</dd>
+          </div>
+          <div v-if="networkCheckResult.backend_country">
+            <dt>出口国家</dt>
+            <dd>{{ networkCheckResult.backend_country }}</dd>
+          </div>
+          <div v-if="networkCheckResult.backend_ip">
+            <dt>出口 IP</dt>
+            <dd>{{ networkCheckResult.backend_ip }}</dd>
+          </div>
+          <div v-if="networkCheckResult.auth_status != null">
+            <dt>OAuth HTTP</dt>
+            <dd>{{ networkCheckResult.auth_status }}</dd>
+          </div>
+        </dl>
+        <p v-if="networkCheckResult.errors.length">
+          错误：{{ networkCheckResult.errors.join("；") }}
+        </p>
+        <p v-if="networkCheckResult.warnings.length">
+          警告：{{ networkCheckResult.warnings.join("；") }}
+        </p>
+        <small v-if="networkCheckResult.backend_country">
+          出口地区仅供参考，OpenAI token exchange 的最终判定可能不同。
+        </small>
+      </div>
+    </section>
     <label class="checkbox-row">
       <input v-model="settings.keep_login_profiles" type="checkbox" />
       <span>保留登录 Profile，用于隔离并复用该账号的浏览器会话</span>
