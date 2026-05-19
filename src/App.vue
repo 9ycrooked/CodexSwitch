@@ -47,7 +47,9 @@ const settings = reactive<Settings>({
   keep_login_profiles: true,
   oauth_login_mode: "external",
   check_updates_on_startup: true,
-  force_update_on_startup: false
+  force_update_on_startup: false,
+  check_oauth_network_on_login: true,
+  check_egress_region: false
 });
 
 const notifications = useNotifications();
@@ -193,7 +195,9 @@ async function saveSettings() {
       keep_login_profiles: Boolean(settings.keep_login_profiles),
       oauth_login_mode: settings.oauth_login_mode,
       check_updates_on_startup: settings.check_updates_on_startup,
-      force_update_on_startup: settings.force_update_on_startup
+      force_update_on_startup: settings.force_update_on_startup,
+      check_oauth_network_on_login: settings.check_oauth_network_on_login,
+      check_egress_region: settings.check_egress_region
     });
     Object.assign(settings, saved);
     await refreshAll();

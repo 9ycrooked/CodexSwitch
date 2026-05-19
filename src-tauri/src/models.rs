@@ -108,7 +108,7 @@ pub struct UsageState {
 pub struct NetworkProbeResult {
     pub name: String,
     pub status: String,
-    pub latency_ms: Option<u128>,
+    pub latency_ms: Option<u64>,
     pub http_status: Option<u16>,
     pub detail: Option<String>,
 }
@@ -119,7 +119,7 @@ pub struct NetworkExitCheckResult {
     pub checked_at: String,
     pub auth_reachable: bool,
     pub auth_status: Option<u16>,
-    pub latency_ms: Option<u128>,
+    pub latency_ms: Option<u64>,
     pub backend_ip: Option<String>,
     pub backend_country: Option<String>,
     pub warnings: Vec<String>,
