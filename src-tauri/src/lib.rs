@@ -7,6 +7,7 @@ mod error;
 mod io;
 mod locations;
 mod models;
+mod network_check;
 mod oauth;
 mod paths;
 mod process;
@@ -27,6 +28,7 @@ pub fn run() {
             oauth::close_oauth_login,
             oauth::complete_oauth_login,
             oauth::refresh_account_tokens,
+            network_check::check_oauth_network_exit,
             quota::check_account_quota,
             quota::list_quota_states,
             quota::fetch_codex_usage,
