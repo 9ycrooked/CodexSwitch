@@ -1,7 +1,16 @@
 <script setup lang="ts">
+import { getVersion } from "@tauri-apps/api/app";
 import { computed, onMounted, reactive, ref } from "vue";
-import type { AccountSummary, BackupSummary, CodexState, Settings } from "./types";
+import type { AccountSummary, AppPaths, BackupSummary, CodexState, Settings } from "./types";
 import * as api from "./api/codexSwitchApi";
+import {
+  openAppStoreDir,
+  openBackupDir,
+  openBackupsDir,
+  openBrowserProfileDir,
+  openCodexHomeDir,
+  readAppPaths
+} from "./api/codexSwitchApi";
 import AppSidebar from "./components/AppSidebar.vue";
 import AppTitlebar from "./components/AppTitlebar.vue";
 import UpdateDialog from "./components/UpdateDialog.vue";
@@ -26,6 +35,8 @@ const busy = ref(false);
 const activeOperation = ref("");
 const notice = ref("");
 const error = ref("");
+const appVersion = ref("");
+const appPaths = ref<AppPaths | null>(null);
 
 const settings = reactive<Settings>({
   codex_home: "C:\\Users\\Y\\.codex",
@@ -76,6 +87,12 @@ async function refreshAll() {
   Object.assign(settings, nextSettings);
 }
 
+async function refreshAppInfo() {
+  const [version, paths] = await Promise.all([getVersion(), readAppPaths()]);
+  appVersion.value = version;
+  appPaths.value = paths;
+}
+
 async function refreshAllWithBusy() {
   busy.value = true;
   try {
@@ -109,6 +126,7 @@ const {
   updateTotalBytes,
   updateProgressPercent,
   updateIsForced,
+  lastUpdateCheckedAt,
   runUpdateCheck,
   checkForUpdatesManually,
   installPendingUpdate,
@@ -176,7 +194,7 @@ async function saveSettings() {
       force_update_on_startup: settings.force_update_on_startup
     });
     Object.assign(settings, saved);
-    await refreshAll();
+    await Promise.all([refreshAll(), refreshAppInfo()]);
     setMessage("设置已保存。");
   } catch (err) {
     setMessage(String(err), true);
@@ -185,10 +203,29 @@ async function saveSettings() {
   }
 }
 
+async function runOpenDirectory(key: string, action: () => Promise<unknown>) {
+  const operationKey = `open:${key}`;
+  activeOperation.value = operationKey;
+  try {
+    await action();
+    setMessage("已打开目录。");
+  } catch (err) {
+    setMessage(String(err), true);
+  } finally {
+    if (activeOperation.value === operationKey) activeOperation.value = "";
+  }
+}
+
+const openCodexHome = () => runOpenDirectory("codex-home", openCodexHomeDir);
+const openAppData = () => runOpenDirectory("app-data", openAppStoreDir);
+const openProfiles = () => runOpenDirectory("profiles", openBrowserProfileDir);
+const openBackups = () => runOpenDirectory("backups", openBackupsDir);
+const openBackup = (backup: BackupSummary) => runOpenDirectory(`backup:${backup.id}`, () => openBackupDir(backup.id));
+
 onMounted(async () => {
   busy.value = true;
   try {
-    await refreshAll();
+    await Promise.all([refreshAll(), refreshAppInfo()]);
     if (!selectedQuotaAccountId.value && accounts.value[0]) {
       selectedQuotaAccountId.value = accounts.value[0].id;
     }
@@ -308,11 +345,16 @@ onMounted(async () => {
         :is-operation-active="isOperationActive"
         :has-active-operation="hasActiveOperation"
         @restore-backup="restoreBackup"
+        @open-backups="openBackups"
+        @open-backup="openBackup"
       />
 
       <SettingsView
         v-else
         :settings="settings"
+        :app-version="appVersion"
+        :app-paths="appPaths"
+        :last-update-checked-at="lastUpdateCheckedAt"
         :busy="busy || isOperationActive('settings:save')"
         :update-checking="updateChecking"
         :update-downloading="updateDownloading"
@@ -321,6 +363,9 @@ onMounted(async () => {
         @update-process-names="updateProcessNames"
         @check-for-updates="checkForUpdatesManually"
         @save-settings="saveSettings"
+        @open-codex-home="openCodexHome"
+        @open-app-data="openAppData"
+        @open-profiles="openProfiles"
       />
     </section>
 
