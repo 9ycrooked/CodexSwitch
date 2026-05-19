@@ -88,6 +88,7 @@ function statusText(status: string) {
     <section class="network-check-panel">
       <div class="panel-heading-row">
         <div>
+          <span class="eyebrow">OAuth Network</span>
           <h3>登录前网络检查</h3>
           <p>检查软件后端是否能访问 OpenAI OAuth 服务；出口地区查询默认关闭。</p>
         </div>
@@ -104,6 +105,7 @@ function statusText(status: string) {
         <span>显示后端出口 IP 和国家代码（使用 Cloudflare trace）</span>
       </label>
       <div v-if="networkCheckResult" class="network-check-result">
+        <p>最近结果：{{ networkCheckResult.overall_status }}</p>
         <dl>
           <div>
             <dt>整体状态</dt>
