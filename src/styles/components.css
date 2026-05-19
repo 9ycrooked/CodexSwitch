@@ -185,7 +185,7 @@
 
 .toast-viewport {
   position: fixed;
-  right: 20px;
+  right: 44px;
   bottom: 20px;
   z-index: 70;
   width: min(340px, calc(100vw - 32px));
@@ -225,7 +225,8 @@
     background 160ms ease;
 }
 
-.toast-viewport:hover .toast-item {
+.toast-viewport:hover .toast-item,
+.toast-viewport:focus-within .toast-item {
   opacity: 1;
   transform: translateY(calc(var(--toast-index) * -54px)) scale(1);
 }

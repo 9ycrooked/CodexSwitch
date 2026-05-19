@@ -13,6 +13,10 @@ defineEmits<{
 function ariaRole(type: ToastMessage["type"]) {
   return type === "error" ? "alert" : "status";
 }
+
+function ariaLive(type: ToastMessage["type"]) {
+  return type === "error" ? "assertive" : "polite";
+}
 </script>
 
 <template>
@@ -20,7 +24,7 @@ function ariaRole(type: ToastMessage["type"]) {
     :class="['toast-item', 'toast-' + toast.type]"
     :style="{ '--toast-index': index }"
     :role="ariaRole(toast.type)"
-    aria-live="polite"
+    :aria-live="ariaLive(toast.type)"
   >
     <span class="toast-stripe" aria-hidden="true"></span>
     <p class="toast-message">{{ toast.message }}</p>

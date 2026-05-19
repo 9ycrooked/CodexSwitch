@@ -47,6 +47,7 @@ export function useNotifications() {
   function remove(id: string) {
     clearTimer(id);
     toasts.value = toasts.value.filter((toast) => toast.id !== id);
+    if (!toasts.value.length) isPaused.value = false;
   }
 
   function startTimer(toast: ToastMessage) {
@@ -107,6 +108,7 @@ export function useNotifications() {
   function clear() {
     for (const toast of toasts.value) clearTimer(toast.id);
     toasts.value = [];
+    isPaused.value = false;
   }
 
   return {
