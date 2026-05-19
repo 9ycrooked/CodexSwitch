@@ -2,6 +2,38 @@
   box-sizing: border-box;
 }
 
+* {
+  scrollbar-color: color-mix(in srgb, var(--primary-color) 72%, var(--border-color)) var(--bg-secondary);
+  scrollbar-width: thin;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: color-mix(in srgb, var(--bg-secondary) 88%, var(--bg-primary));
+}
+
+*::-webkit-scrollbar-thumb {
+  border: 2px solid color-mix(in srgb, var(--bg-secondary) 88%, var(--bg-primary));
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--primary-color) 72%, var(--border-color));
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--primary-hover) 82%, var(--border-hover));
+}
+
+*::-webkit-scrollbar-thumb:active {
+  background: color-mix(in srgb, var(--primary-active) 86%, var(--border-hover));
+}
+
+*::-webkit-scrollbar-corner {
+  background: var(--bg-secondary);
+}
+
 html,
 body,
 #app {
