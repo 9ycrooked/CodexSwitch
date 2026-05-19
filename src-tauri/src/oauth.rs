@@ -395,6 +395,17 @@ fn refresh_tokens(refresh_token: &str) -> AppResult<TokenResponse> {
     Ok(token)
 }
 
+fn format_token_error(label: &str, status: u16, body: &str) -> String {
+    let parsed = serde_json::from_str::<Value>(body).unwrap_or(Value::Null);
+    let code = parsed.pointer("/error/code").and_then(Value::as_str);
+    if code == Some("unsupported_country_region_territory") {
+        return format!(
+            "{label} 失败：后端请求被 OpenAI 判定为不支持地区。浏览器登录窗口和软件后端可能没有使用同一个网络出口，请先在设置里运行登录前网络检查。原始响应：HTTP {status}: {body}"
+        );
+    }
+    format!("{label} 失败：HTTP {status}: {body}")
+}
+
 fn parse_token_http_response(
     response: reqwest::blocking::Response,
     label: &str,
@@ -402,7 +413,7 @@ fn parse_token_http_response(
     let status = response.status();
     let body = response.text().map_err(|err| err.to_string())?;
     if !status.is_success() {
-        return Err(format!("{label} 失败：HTTP {status}: {body}"));
+        return Err(format_token_error(label, status.as_u16(), &body));
     }
     serde_json::from_str(&body).map_err(|err| format!("{label} 响应解析失败：{err}"))
 }
@@ -464,5 +475,13 @@ mod tests {
         assert_eq!(parsed.get("state").map(String::as_str), Some("state-1"));
         let query = extract_query_from_request_line("GET /auth/callback?code=abc&state=s HTTP/1.1");
         assert_eq!(query.as_deref(), Some("code=abc&state=s"));
+    }
+
+    #[test]
+    fn formats_unsupported_region_token_error() {
+        let body = r#"{"error":{"code":"unsupported_country_region_territory","message":"Country, region, or territory not supported","type":"request_forbidden"}}"#;
+        let message = format_token_error("token exchange", 403, body);
+        assert!(message.contains("后端请求被 OpenAI 判定为不支持地区"));
+        assert!(message.contains("浏览器登录窗口和软件后端可能没有使用同一个网络出口"));
     }
 }
