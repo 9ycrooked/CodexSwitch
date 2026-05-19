@@ -8,6 +8,11 @@ use crate::settings::load_settings;
 const CLOUDFLARE_TRACE_URL: &str = "https://www.cloudflare.com/cdn-cgi/trace";
 const OPENAI_AUTH_METADATA_URL: &str = "https://auth.openai.com/.well-known/openid-configuration";
 
+struct ProbeResponse {
+    result: NetworkProbeResult,
+    body: String,
+}
+
 fn parse_cloudflare_trace(text: &str) -> (Option<String>, Option<String>) {
     let mut ip = None;
     let mut country = None;
@@ -39,7 +44,40 @@ fn classify_result(result: &mut NetworkExitCheckResult) {
     .to_string();
 }
 
-fn probe_get(client: &reqwest::blocking::Client, name: &str, url: &str) -> NetworkProbeResult {
+fn probe_response_result(
+    name: &str,
+    status_code: u16,
+    text: &str,
+    latency_ms: u64,
+    require_success: bool,
+) -> NetworkProbeResult {
+    let is_success = (200..300).contains(&status_code);
+    let reachable = if require_success {
+        is_success
+    } else {
+        (200..500).contains(&status_code)
+    };
+    let detail = if reachable || text.trim().is_empty() {
+        format!("HTTP {status_code}")
+    } else {
+        format!("HTTP {status_code}: {text}")
+    };
+
+    NetworkProbeResult {
+        name: name.to_string(),
+        status: if reachable { "ok" } else { "failed" }.to_string(),
+        latency_ms: Some(latency_ms),
+        http_status: Some(status_code),
+        detail: Some(detail),
+    }
+}
+
+fn probe_get(
+    client: &reqwest::blocking::Client,
+    name: &str,
+    url: &str,
+    require_success: bool,
+) -> ProbeResponse {
     let started_at = Instant::now();
     match client.get(url).send() {
         Ok(response) => {
@@ -51,37 +89,32 @@ fn probe_get(client: &reqwest::blocking::Client, name: &str, url: &str) -> Netwo
             let status = response.status();
             let status_code = status.as_u16();
             let text = response.text().unwrap_or_default();
-            let reachable =
-                status.is_success() || status.is_redirection() || status.is_client_error();
-            let detail = if url == CLOUDFLARE_TRACE_URL && reachable {
-                text
-            } else if reachable {
-                format!("HTTP {status_code}")
-            } else if text.trim().is_empty() {
-                format!("HTTP {status_code}")
-            } else {
-                format!("HTTP {status_code}: {text}")
-            };
-            NetworkProbeResult {
-                name: name.to_string(),
-                status: if reachable { "ok" } else { "failed" }.to_string(),
-                latency_ms: Some(elapsed_ms),
-                http_status: Some(status_code),
-                detail: Some(detail),
+            ProbeResponse {
+                result: probe_response_result(
+                    name,
+                    status_code,
+                    &text,
+                    elapsed_ms,
+                    require_success,
+                ),
+                body: text,
             }
         }
-        Err(err) => NetworkProbeResult {
-            name: name.to_string(),
-            status: "failed".to_string(),
-            latency_ms: Some(
-                started_at
-                    .elapsed()
-                    .as_millis()
-                    .try_into()
-                    .unwrap_or(u64::MAX),
-            ),
-            http_status: None,
-            detail: Some(err.to_string()),
+        Err(err) => ProbeResponse {
+            result: NetworkProbeResult {
+                name: name.to_string(),
+                status: "failed".to_string(),
+                latency_ms: Some(
+                    started_at
+                        .elapsed()
+                        .as_millis()
+                        .try_into()
+                        .unwrap_or(u64::MAX),
+                ),
+                http_status: None,
+                detail: Some(err.to_string()),
+            },
+            body: String::new(),
         },
     }
 }
@@ -108,7 +141,7 @@ fn check_oauth_network_exit_blocking(
         ..NetworkExitCheckResult::default()
     };
 
-    let auth_probe = probe_get(&client, "OpenAI OAuth", OPENAI_AUTH_METADATA_URL);
+    let auth_probe = probe_get(&client, "OpenAI OAuth", OPENAI_AUTH_METADATA_URL, true).result;
     result.auth_reachable = auth_probe.status == "ok";
     result.auth_status = auth_probe.http_status;
     result.latency_ms = auth_probe.latency_ms;
@@ -124,10 +157,10 @@ fn check_oauth_network_exit_blocking(
     result.probes.push(auth_probe);
 
     if include_egress_region {
-        let trace_probe = probe_get(&client, "Cloudflare trace", CLOUDFLARE_TRACE_URL);
+        let trace_response = probe_get(&client, "Cloudflare trace", CLOUDFLARE_TRACE_URL, false);
+        let trace_probe = trace_response.result;
         if trace_probe.status == "ok" {
-            let (ip, country) =
-                parse_cloudflare_trace(trace_probe.detail.as_deref().unwrap_or_default());
+            let (ip, country) = parse_cloudflare_trace(&trace_response.body);
             result.backend_ip = ip;
             result.backend_country = country;
             if result.backend_country.is_none() {
@@ -182,5 +215,33 @@ mod tests {
         result.errors.push("down".to_string());
         classify_result(&mut result);
         assert_eq!(result.overall_status, "failed");
+    }
+
+    #[test]
+    fn cloudflare_probe_detail_is_sanitized_without_losing_parseable_trace() {
+        let trace = "fl=abc\nip=203.0.113.10\nloc=US\nwarp=off\n";
+        let probe = probe_response_result("Cloudflare trace", 200, trace, 42, false);
+
+        assert_eq!(probe.status, "ok");
+        assert_eq!(probe.http_status, Some(200));
+        assert_eq!(probe.detail.as_deref(), Some("HTTP 200"));
+
+        let (ip, country) = parse_cloudflare_trace(trace);
+        assert_eq!(ip.as_deref(), Some("203.0.113.10"));
+        assert_eq!(country.as_deref(), Some("US"));
+    }
+
+    #[test]
+    fn oauth_metadata_probe_requires_success_status() {
+        let redirect = probe_response_result("OpenAI OAuth", 302, "", 42, true);
+        let client_error = probe_response_result("OpenAI OAuth", 404, "not found", 42, true);
+        let success = probe_response_result("OpenAI OAuth", 200, "{}", 42, true);
+
+        assert_eq!(redirect.status, "failed");
+        assert_eq!(redirect.detail.as_deref(), Some("HTTP 302"));
+        assert_eq!(client_error.status, "failed");
+        assert_eq!(client_error.detail.as_deref(), Some("HTTP 404: not found"));
+        assert_eq!(success.status, "ok");
+        assert_eq!(success.detail.as_deref(), Some("HTTP 200"));
     }
 }
