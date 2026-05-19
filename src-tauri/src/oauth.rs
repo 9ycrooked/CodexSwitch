@@ -395,7 +395,7 @@ fn refresh_tokens(refresh_token: &str) -> AppResult<TokenResponse> {
     Ok(token)
 }
 
-fn format_token_error(label: &str, status: u16, body: &str) -> String {
+fn format_token_error(label: &str, status: reqwest::StatusCode, body: &str) -> String {
     let parsed = serde_json::from_str::<Value>(body).unwrap_or(Value::Null);
     let code = parsed.pointer("/error/code").and_then(Value::as_str);
     if code == Some("unsupported_country_region_territory") {
@@ -413,7 +413,7 @@ fn parse_token_http_response(
     let status = response.status();
     let body = response.text().map_err(|err| err.to_string())?;
     if !status.is_success() {
-        return Err(format_token_error(label, status.as_u16(), &body));
+        return Err(format_token_error(label, status, &body));
     }
     serde_json::from_str(&body).map_err(|err| format!("{label} 响应解析失败：{err}"))
 }
@@ -480,8 +480,19 @@ mod tests {
     #[test]
     fn formats_unsupported_region_token_error() {
         let body = r#"{"error":{"code":"unsupported_country_region_territory","message":"Country, region, or territory not supported","type":"request_forbidden"}}"#;
-        let message = format_token_error("token exchange", 403, body);
+        let message = format_token_error("token exchange", reqwest::StatusCode::FORBIDDEN, body);
         assert!(message.contains("后端请求被 OpenAI 判定为不支持地区"));
         assert!(message.contains("浏览器登录窗口和软件后端可能没有使用同一个网络出口"));
+        assert!(message.contains("原始响应：HTTP 403 Forbidden:"));
+    }
+
+    #[test]
+    fn formats_generic_token_error_with_status_reason_phrase() {
+        let body = r#"{"error":"forbidden"}"#;
+        let message = format_token_error("token exchange", reqwest::StatusCode::FORBIDDEN, body);
+        assert_eq!(
+            message,
+            r#"token exchange 失败：HTTP 403 Forbidden: {"error":"forbidden"}"#
+        );
     }
 }
