@@ -58,7 +58,7 @@ defineEmits<{
         <p>{{ hasTotalBytes ? `${progressPercent}%` : "正在下载更新..." }}</p>
       </div>
 
-      <p v-if="error" class="notice error">{{ error }}</p>
+      <p v-if="error" class="update-error-message">{{ error }}</p>
 
       <div class="modal-actions">
         <button
