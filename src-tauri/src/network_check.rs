@@ -64,7 +64,7 @@ fn probe_get(client: &reqwest::blocking::Client, name: &str, url: &str) -> Netwo
             };
             NetworkProbeResult {
                 name: name.to_string(),
-                status: if reachable { "reachable" } else { "failed" }.to_string(),
+                status: if reachable { "ok" } else { "failed" }.to_string(),
                 latency_ms: Some(elapsed_ms),
                 http_status: Some(status_code),
                 detail: Some(detail),
@@ -109,7 +109,7 @@ fn check_oauth_network_exit_blocking(
     };
 
     let auth_probe = probe_get(&client, "OpenAI OAuth", OPENAI_AUTH_METADATA_URL);
-    result.auth_reachable = auth_probe.status == "reachable";
+    result.auth_reachable = auth_probe.status == "ok";
     result.auth_status = auth_probe.http_status;
     result.latency_ms = auth_probe.latency_ms;
     if !result.auth_reachable {
@@ -125,7 +125,7 @@ fn check_oauth_network_exit_blocking(
 
     if include_egress_region {
         let trace_probe = probe_get(&client, "Cloudflare trace", CLOUDFLARE_TRACE_URL);
-        if trace_probe.status == "reachable" {
+        if trace_probe.status == "ok" {
             let (ip, country) =
                 parse_cloudflare_trace(trace_probe.detail.as_deref().unwrap_or_default());
             result.backend_ip = ip;
