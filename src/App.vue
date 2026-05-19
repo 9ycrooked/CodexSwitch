@@ -194,8 +194,13 @@ async function saveSettings() {
       force_update_on_startup: settings.force_update_on_startup
     });
     Object.assign(settings, saved);
-    await Promise.all([refreshAll(), refreshAppInfo()]);
-    setMessage("设置已保存。");
+    await refreshAll();
+    try {
+      await refreshAppInfo();
+      setMessage("设置已保存。");
+    } catch (err) {
+      setMessage(`设置已保存，但应用信息刷新失败：${String(err)}`, true);
+    }
   } catch (err) {
     setMessage(String(err), true);
   } finally {
@@ -225,7 +230,12 @@ const openBackup = (backup: BackupSummary) => runOpenDirectory(`backup:${backup.
 onMounted(async () => {
   busy.value = true;
   try {
-    await Promise.all([refreshAll(), refreshAppInfo()]);
+    await refreshAll();
+    try {
+      await refreshAppInfo();
+    } catch (err) {
+      setMessage(String(err), true);
+    }
     if (!selectedQuotaAccountId.value && accounts.value[0]) {
       selectedQuotaAccountId.value = accounts.value[0].id;
     }
