@@ -19,6 +19,35 @@
   animation: fade-in-up 260ms ease both;
 }
 
+.settings-info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.info-card {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+}
+
+.field-with-action,
+.inline-actions,
+.row-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.field-with-action input {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
 .panel-head {
   margin-bottom: 14px;
   padding: 12px;

@@ -1,9 +1,13 @@
 <script setup lang="ts">
-import type { Settings } from "../types";
+import type { AppPaths, Settings } from "../types";
+import { formatDate } from "../utils/format";
 
 defineProps<{
   settings: Settings;
   busy: boolean;
+  appVersion: string;
+  appPaths: AppPaths | null;
+  lastUpdateCheckedAt: string | null;
   updateChecking: boolean;
   updateDownloading: boolean;
   updatePolicySource: string;
@@ -14,14 +18,36 @@ defineEmits<{
   updateProcessNames: [Event];
   checkForUpdates: [];
   saveSettings: [];
+  openCodexHome: [];
+  openAppData: [];
+  openProfiles: [];
 }>();
 </script>
 
 <template>
   <section class="panel settings">
+    <section class="settings-info-grid">
+      <article class="info-card">
+        <span class="eyebrow">App</span>
+        <h3>应用信息</h3>
+        <p>当前版本：{{ appVersion || "读取中" }}</p>
+        <p>最近检查：{{ lastUpdateCheckedAt ? formatDate(lastUpdateCheckedAt) : "从未检查" }}</p>
+      </article>
+      <article class="info-card">
+        <span class="eyebrow">Storage</span>
+        <h3>数据位置</h3>
+        <p>应用数据：{{ appPaths?.app_store_dir || "读取中" }}</p>
+        <div class="inline-actions">
+          <button class="secondary" type="button" :disabled="busy" @click="$emit('openAppData')">打开应用数据</button>
+        </div>
+      </article>
+    </section>
     <label class="form-group">
       <span>Codex home</span>
-      <input v-model="settings.codex_home" />
+      <div class="field-with-action">
+        <input v-model="settings.codex_home" />
+        <button class="secondary" type="button" :disabled="busy" @click="$emit('openCodexHome')">打开</button>
+      </div>
     </label>
     <label class="form-group">
       <span>Codex 进程名</span>
@@ -33,7 +59,10 @@ defineEmits<{
     </label>
     <label class="form-group">
       <span>WebView2 Profile 目录</span>
-      <input v-model="settings.browser_profile_dir" />
+      <div class="field-with-action">
+        <input v-model="settings.browser_profile_dir" />
+        <button class="secondary" type="button" :disabled="busy" @click="$emit('openProfiles')">打开</button>
+      </div>
     </label>
     <label class="form-group">
       <span>OAuth callback 端口</span>
