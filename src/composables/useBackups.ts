@@ -23,7 +23,7 @@ export function useBackups(deps: {
       try {
         const backup = await api.backupCurrentState();
         await deps.refreshAll();
-        deps.setMessage("success", `已创建备份 ${backup.id}。`);
+        deps.setMessage("success", `已创建备份 ${backup.id}`);
       } catch (err) {
         deps.setMessage("error", String(err));
       }
@@ -37,7 +37,7 @@ export function useBackups(deps: {
       try {
         await api.restoreBackup(backup.id);
         await deps.refreshAll();
-        deps.setMessage("success", `已恢复备份 ${backup.id}。`);
+        deps.setMessage("success", `已恢复备份 ${backup.id}`);
       } catch (err) {
         deps.setMessage("error", String(err));
       }

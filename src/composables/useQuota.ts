@@ -36,7 +36,7 @@ export function useQuota(deps: {
       try {
         const quota = await api.checkAccountQuota(account.id, account.plan?.includes("free") ? "gpt-5.5" : "gpt-5.5");
         await deps.refreshAll();
-        deps.setMessage("success", "额度检查完成。");
+        deps.setMessage("success", "额度检查完成");
       } catch (err) {
         deps.setMessage("error", String(err));
       }
@@ -46,7 +46,7 @@ export function useQuota(deps: {
   async function fetchUsage(account?: AccountSummary | null) {
     const target = account || selectedQuotaAccount.value;
     if (!target) {
-      deps.setMessage("warning", "请先选择一个账号。");
+      deps.setMessage("warning", "请先选择一个账号");
       return;
     }
     await runOperation(`quota:${target.id}`, async () => {
@@ -54,7 +54,7 @@ export function useQuota(deps: {
         const state = await api.fetchCodexUsage(target.id);
         await deps.refreshAll();
         selectedQuotaAccountId.value = target.id;
-        deps.setMessage("success", "额度检查完成。");
+        deps.setMessage("success", "额度检查完成");
       } catch (err) {
         deps.setMessage("error", String(err));
       }
@@ -64,7 +64,7 @@ export function useQuota(deps: {
   async function fetchAllUsage() {
     const targets = deps.accounts.value.filter((account) => !account.disabled);
     if (!targets.length) {
-      deps.setMessage("warning", "没有可检查的账号。");
+      deps.setMessage("warning", "没有可检查的账号");
       return;
     }
 
@@ -82,7 +82,7 @@ export function useQuota(deps: {
       }
 
       await deps.refreshAll();
-      deps.setMessage(failed > 0 ? "warning" : "success", `全部额度检查完成：成功 ${succeeded} 个，失败 ${failed} 个。`);
+      deps.setMessage(failed > 0 ? "warning" : "success", `全部额度检查完成：成功 ${succeeded} 个，失败 ${failed} 个`);
     });
   }
 
@@ -94,7 +94,7 @@ export function useQuota(deps: {
         await api.clearUsageState(target.id);
         await deps.refreshAll();
         selectedQuotaAccountId.value = target.id;
-        deps.setMessage("success", "已清除该账号的额度记录。");
+        deps.setMessage("success", "已清除该账号的额度记录");
       } catch (err) {
         deps.setMessage("error", String(err));
       }

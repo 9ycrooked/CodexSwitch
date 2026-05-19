@@ -36,7 +36,7 @@ export function useAccounts(deps: {
       try {
         const imported = await api.importAccounts(paths);
         await deps.refreshAll();
-        deps.setMessage("success", `已导入 ${imported.length} 个账号。`);
+        deps.setMessage("success", `已导入 ${imported.length} 个账号`);
       } catch (err) {
         deps.setMessage("error", String(err));
       }
@@ -48,7 +48,7 @@ export function useAccounts(deps: {
       try {
         const result = await api.startOauthLogin();
         const modeText = result.mode === "embedded" ? "内置 WebView2" : "外部隔离浏览器";
-        deps.setMessage("info", `已打开 ${modeText} OAuth 登录。Profile: ${result.browser_profile_dir}`);
+        deps.setMessage("info", `已打开 ${modeText} OAuth 登录 Profile: ${result.browser_profile_dir}`);
       } catch (err) {
         deps.setMessage("error", String(err));
       }
@@ -59,7 +59,7 @@ export function useAccounts(deps: {
     await runOperation("oauth:close", async () => {
       try {
         await api.closeOauthLogin();
-        deps.setMessage("info", "已关闭等待中的 OAuth 登录窗口。");
+        deps.setMessage("info", "已关闭等待中的 OAuth 登录窗口");
       } catch (err) {
         deps.setMessage("error", String(err));
       }
@@ -71,7 +71,7 @@ export function useAccounts(deps: {
       try {
         const updated = await api.refreshAccountTokens(account.id);
         await deps.refreshAll();
-        deps.setMessage("success", `已刷新 ${updated.display_name} 的认证状态。`);
+        deps.setMessage("success", `已刷新 ${updated.display_name} 的认证状态`);
       } catch (err) {
         deps.setMessage("error", String(err));
       }
@@ -92,7 +92,7 @@ export function useAccounts(deps: {
         const warningText = result.warnings.length ? ` 警告：${result.warnings.join("；")}` : "";
         deps.setMessage(
           result.warnings.length ? "warning" : "success",
-          `已切换到 ${result.account.display_name}，备份 ${result.backup_id} 已创建。${warningText}`
+          `已切换到 ${result.account.display_name}，备份 ${result.backup_id} 已创建${warningText}`
         );
       } catch (err) {
         deps.setMessage("error", String(err));

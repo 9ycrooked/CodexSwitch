@@ -86,7 +86,7 @@ export function useUpdater(settings: Settings, setMessage: (type: ToastType, mes
     try {
       const update = await check();
       if (!update) {
-        if (manual) setMessage("info", "当前已经是最新版本。");
+        if (manual) setMessage("info", "当前已经是最新版本");
         return;
       }
 

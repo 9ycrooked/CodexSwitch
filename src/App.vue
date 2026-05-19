@@ -199,7 +199,7 @@ async function saveSettings() {
     await refreshAll();
     try {
       await refreshAppInfo();
-      setMessage("success", "设置已保存。");
+      setMessage("success", "设置已保存");
     } catch (err) {
       setMessage("warning", `设置已保存，但应用信息刷新失败：${String(err)}`);
     }
@@ -215,7 +215,7 @@ async function runOpenDirectory(key: string, action: () => Promise<unknown>) {
   activeOperation.value = operationKey;
   try {
     await action();
-    setMessage("info", "已打开目录。");
+    setMessage("info", "已打开目录");
   } catch (err) {
     setMessage("error", String(err));
   } finally {
