@@ -83,11 +83,7 @@ defineEmits<{
       <div>
         <span class="eyebrow">Updater</span>
         <h3>更新检查</h3>
-        <p>
-          启动检查和强制更新策略由发布包里的 update-policy.json 控制。默认策略为启动时检查更新，发现新版本时询问是否更新。
-        </p>
         <small>当前策略：{{ updatePolicySource }}</small>
-        <small v-if="updatePolicyError">{{ updatePolicyError }}</small>
       </div>
       <button
         class="secondary"
@@ -98,7 +94,7 @@ defineEmits<{
       </button>
     </section>
     <div class="warning">
-      当前版本按你的要求使用明文保存账号凭据。WebView2 Profile 只是隔离 cookie/cache/localStorage，不伪造设备指纹；账号库包含 refresh token，请不要共享应用数据目录或导出的账号文件。
+      当前版本使用明文保存账号凭据。WebView2 Profile 只是隔离 cookie/cache/localStorage，不伪造设备指纹；账号库包含 refresh token，请不要共享应用数据目录或导出的账号文件。
     </div>
     <button :disabled="busy" @click="$emit('saveSettings')">保存设置</button>
   </section>
