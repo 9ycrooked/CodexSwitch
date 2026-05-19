@@ -1,7 +1,6 @@
 import { computed, ref, type Ref } from "vue";
 import type { AccountSummary } from "../types";
 import * as api from "../api/codexSwitchApi";
-import { quotaLabel, usageLabel } from "../utils/format";
 import type { ToastType } from "./useNotifications";
 
 export function useQuota(deps: {
@@ -37,7 +36,7 @@ export function useQuota(deps: {
       try {
         const quota = await api.checkAccountQuota(account.id, account.plan?.includes("free") ? "gpt-5.5" : "gpt-5.5");
         await deps.refreshAll();
-        deps.setMessage("success", `额度状态：${quotaLabel(quota)}。`);
+        deps.setMessage("success", "额度检查完成。");
       } catch (err) {
         deps.setMessage("error", String(err));
       }
@@ -55,7 +54,7 @@ export function useQuota(deps: {
         const state = await api.fetchCodexUsage(target.id);
         await deps.refreshAll();
         selectedQuotaAccountId.value = target.id;
-        deps.setMessage("success", `额度状态：${usageLabel(state)}。`);
+        deps.setMessage("success", "额度检查完成。");
       } catch (err) {
         deps.setMessage("error", String(err));
       }
