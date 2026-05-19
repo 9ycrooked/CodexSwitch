@@ -105,6 +105,29 @@ pub struct UsageState {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct NetworkProbeResult {
+    pub name: String,
+    pub status: String,
+    pub latency_ms: Option<u128>,
+    pub http_status: Option<u16>,
+    pub detail: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct NetworkExitCheckResult {
+    pub overall_status: String,
+    pub checked_at: String,
+    pub auth_reachable: bool,
+    pub auth_status: Option<u16>,
+    pub latency_ms: Option<u128>,
+    pub backend_ip: Option<String>,
+    pub backend_country: Option<String>,
+    pub warnings: Vec<String>,
+    pub errors: Vec<String>,
+    pub probes: Vec<NetworkProbeResult>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct CodexQuotaWindow {
     pub id: String,
     pub label: String,

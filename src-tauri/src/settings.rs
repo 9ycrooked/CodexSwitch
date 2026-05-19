@@ -25,6 +25,10 @@ pub struct Settings {
     pub check_updates_on_startup: bool,
     #[serde(default)]
     pub force_update_on_startup: bool,
+    #[serde(default = "default_true")]
+    pub check_oauth_network_on_login: bool,
+    #[serde(default)]
+    pub check_egress_region: bool,
 }
 
 pub fn load_settings() -> AppResult<Settings> {
@@ -52,6 +56,8 @@ pub fn default_settings() -> Settings {
         oauth_login_mode: default_oauth_login_mode(),
         check_updates_on_startup: default_true(),
         force_update_on_startup: false,
+        check_oauth_network_on_login: true,
+        check_egress_region: false,
     }
 }
 
@@ -87,6 +93,8 @@ pub fn update_settings(settings: Settings) -> AppResult<Settings> {
         oauth_login_mode: sanitize_oauth_login_mode(&settings.oauth_login_mode),
         check_updates_on_startup: settings.check_updates_on_startup,
         force_update_on_startup: settings.force_update_on_startup,
+        check_oauth_network_on_login: settings.check_oauth_network_on_login,
+        check_egress_region: settings.check_egress_region,
     };
     atomic_write_json(&settings_path()?, &sanitized)?;
     Ok(sanitized)
@@ -160,5 +168,7 @@ mod tests {
 
         assert!(settings.check_updates_on_startup);
         assert!(!settings.force_update_on_startup);
+        assert!(settings.check_oauth_network_on_login);
+        assert!(!settings.check_egress_region);
     }
 }

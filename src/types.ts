@@ -40,6 +40,27 @@ export type UsageState = {
   windows: CodexQuotaWindow[];
 };
 
+export type NetworkProbeResult = {
+  name: string;
+  status: string;
+  latency_ms?: number | null;
+  http_status?: number | null;
+  detail?: string | null;
+};
+
+export type NetworkExitCheckResult = {
+  overall_status: "ok" | "warning" | "failed" | string;
+  checked_at: string;
+  auth_reachable: boolean;
+  auth_status?: number | null;
+  latency_ms?: number | null;
+  backend_ip?: string | null;
+  backend_country?: string | null;
+  warnings: string[];
+  errors: string[];
+  probes: NetworkProbeResult[];
+};
+
 export type CodexQuotaWindow = {
   id: string;
   label: string;
@@ -73,6 +94,8 @@ export type Settings = {
   oauth_login_mode: string;
   check_updates_on_startup: boolean;
   force_update_on_startup: boolean;
+  check_oauth_network_on_login: boolean;
+  check_egress_region: boolean;
 };
 
 export type CodexState = {
