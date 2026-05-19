@@ -146,6 +146,7 @@ const {
   selectedQuotaAccount,
   selectQuotaAccount: selectQuotaAccountBase,
   fetchUsage,
+  fetchAllUsage,
   clearUsage
 } = useQuota({
   accounts,
@@ -344,6 +345,7 @@ onMounted(async () => {
         :has-active-operation="hasActiveOperation"
         @refresh-all="refreshAllWithBusy"
         @fetch-usage="fetchUsage"
+        @fetch-all-usage="fetchAllUsage"
         @refresh-tokens="refreshTokens"
         @clear-usage="clearUsage"
       />
