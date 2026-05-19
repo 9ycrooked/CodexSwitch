@@ -15,7 +15,6 @@ defineEmits<{
 
 <template>
   <TransitionGroup
-    v-if="toasts.length"
     tag="section"
     class="toast-viewport"
     name="toast-stack"
