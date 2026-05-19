@@ -50,6 +50,14 @@ pub struct CodexState {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AppPaths {
+    pub codex_home: String,
+    pub app_store_dir: String,
+    pub backups_dir: String,
+    pub browser_profile_dir: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SwitchResult {
     pub account: AccountSummary,
     pub backup_id: String,

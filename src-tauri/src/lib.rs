@@ -5,6 +5,7 @@ mod commands;
 mod config_merge;
 mod error;
 mod io;
+mod locations;
 mod models;
 mod oauth;
 mod paths;
@@ -34,6 +35,12 @@ pub fn run() {
             backups::backup_current_state,
             backups::restore_backup,
             codex_home::read_current_codex_state,
+            locations::read_app_paths,
+            locations::open_codex_home_dir,
+            locations::open_app_store_dir,
+            locations::open_browser_profile_dir,
+            locations::open_backups_dir,
+            locations::open_backup_dir,
             settings::read_settings,
             settings::update_settings
         ])
