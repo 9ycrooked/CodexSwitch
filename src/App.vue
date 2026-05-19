@@ -13,9 +13,11 @@ import {
 } from "./api/codexSwitchApi";
 import AppSidebar from "./components/AppSidebar.vue";
 import AppTitlebar from "./components/AppTitlebar.vue";
+import ToastViewport from "./components/ToastViewport.vue";
 import UpdateDialog from "./components/UpdateDialog.vue";
 import { useAccounts } from "./composables/useAccounts";
 import { useBackups } from "./composables/useBackups";
+import { useNotifications } from "./composables/useNotifications";
 import { useQuota } from "./composables/useQuota";
 import { useUpdater } from "./composables/useUpdater";
 import { useWindowControls } from "./composables/useWindowControls";
@@ -33,8 +35,6 @@ const selectedTab = ref<"accounts" | "quota" | "backups" | "settings">("accounts
 const query = ref("");
 const busy = ref(false);
 const activeOperation = ref("");
-const notice = ref("");
-const error = ref("");
 const appVersion = ref("");
 const appPaths = ref<AppPaths | null>(null);
 
@@ -49,6 +49,8 @@ const settings = reactive<Settings>({
   check_updates_on_startup: true,
   force_update_on_startup: false
 });
+
+const notifications = useNotifications();
 
 const filteredAccounts = computed(() => {
   const needle = query.value.trim().toLowerCase();
@@ -70,8 +72,11 @@ function updateProcessNames(event: Event) {
 }
 
 function setMessage(message: string, isError = false) {
-  notice.value = isError ? "" : message;
-  error.value = isError ? message : "";
+  if (isError) {
+    notifications.error(message);
+    return;
+  }
+  notifications.success(message);
 }
 
 async function refreshAll() {
@@ -317,9 +322,6 @@ onMounted(async () => {
         </div>
       </div>
 
-      <div v-if="notice" class="notice">{{ notice }}</div>
-      <div v-if="error" class="notice error">{{ error }}</div>
-
       <AccountsView
         v-if="selectedTab === 'accounts'"
         v-model:query="query"
@@ -380,6 +382,13 @@ onMounted(async () => {
         @open-profiles="openProfiles"
       />
     </section>
+
+    <ToastViewport
+      :toasts="notifications.toasts.value"
+      @close="notifications.remove"
+      @pause="notifications.pause"
+      @resume="notifications.resume"
+    />
 
     <UpdateDialog
       :open="updateDialogOpen"
