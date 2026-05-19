@@ -2,6 +2,13 @@
   box-sizing: border-box;
 }
 
+html,
+body,
+#app {
+  height: 100%;
+  overflow: hidden;
+}
+
 html {
   background: var(--bg-secondary);
 }
@@ -9,7 +16,6 @@ html {
 body {
   margin: 0;
   min-width: 320px;
-  min-height: 100vh;
   font-size: var(--font-size-base);
   background:
     radial-gradient(circle at 16% 0%, color-mix(in srgb, var(--primary-color) 13%, transparent), transparent 34rem),

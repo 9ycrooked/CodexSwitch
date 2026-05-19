@@ -1,7 +1,9 @@
 .shell {
   display: block;
-  padding-top: var(--titlebar-height);
-  min-height: 100vh;
+  position: fixed;
+  inset: var(--titlebar-height) 0 0;
+  overflow: auto;
+  min-height: 0;
 }
 
 .app-titlebar {

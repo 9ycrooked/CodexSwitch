@@ -666,6 +666,7 @@ dd {
   .shell {
     display: grid;
     grid-template-columns: 1fr;
+    align-content: start;
   }
 
   .quota-monitor-grid {
