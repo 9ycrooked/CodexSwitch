@@ -2,12 +2,13 @@ import { computed, ref, type Ref } from "vue";
 import type { AccountSummary } from "../types";
 import * as api from "../api/codexSwitchApi";
 import { quotaLabel, usageLabel } from "../utils/format";
+import type { ToastType } from "./useNotifications";
 
 export function useQuota(deps: {
   accounts: Ref<AccountSummary[]>;
   activeOperation: Ref<string>;
   refreshAll: () => Promise<void>;
-  setMessage: (message: string, isError?: boolean) => void;
+  setMessage: (type: ToastType, message: string) => void;
 }) {
   const selectedQuotaAccountId = ref("");
   const selectedQuotaAccount = computed(() => {
@@ -36,9 +37,9 @@ export function useQuota(deps: {
       try {
         const quota = await api.checkAccountQuota(account.id, account.plan?.includes("free") ? "gpt-5.5" : "gpt-5.5");
         await deps.refreshAll();
-        deps.setMessage(`额度状态：${quotaLabel(quota)}。`);
+        deps.setMessage("success", `额度状态：${quotaLabel(quota)}。`);
       } catch (err) {
-        deps.setMessage(String(err), true);
+        deps.setMessage("error", String(err));
       }
     });
   }
@@ -46,7 +47,7 @@ export function useQuota(deps: {
   async function fetchUsage(account?: AccountSummary | null) {
     const target = account || selectedQuotaAccount.value;
     if (!target) {
-      deps.setMessage("请先选择一个账号。", true);
+      deps.setMessage("warning", "请先选择一个账号。");
       return;
     }
     await runOperation(`quota:${target.id}`, async () => {
@@ -54,9 +55,9 @@ export function useQuota(deps: {
         const state = await api.fetchCodexUsage(target.id);
         await deps.refreshAll();
         selectedQuotaAccountId.value = target.id;
-        deps.setMessage(`额度状态：${usageLabel(state)}。`);
+        deps.setMessage("success", `额度状态：${usageLabel(state)}。`);
       } catch (err) {
-        deps.setMessage(String(err), true);
+        deps.setMessage("error", String(err));
       }
     });
   }
@@ -64,7 +65,7 @@ export function useQuota(deps: {
   async function fetchAllUsage() {
     const targets = deps.accounts.value.filter((account) => !account.disabled);
     if (!targets.length) {
-      deps.setMessage("没有可检查的账号。", true);
+      deps.setMessage("warning", "没有可检查的账号。");
       return;
     }
 
@@ -82,7 +83,7 @@ export function useQuota(deps: {
       }
 
       await deps.refreshAll();
-      deps.setMessage(`全部额度检查完成：成功 ${succeeded} 个，失败 ${failed} 个。`, failed > 0);
+      deps.setMessage(failed > 0 ? "warning" : "success", `全部额度检查完成：成功 ${succeeded} 个，失败 ${failed} 个。`);
     });
   }
 
@@ -94,9 +95,9 @@ export function useQuota(deps: {
         await api.clearUsageState(target.id);
         await deps.refreshAll();
         selectedQuotaAccountId.value = target.id;
-        deps.setMessage("已清除该账号的额度记录。");
+        deps.setMessage("success", "已清除该账号的额度记录。");
       } catch (err) {
-        deps.setMessage(String(err), true);
+        deps.setMessage("error", String(err));
       }
     });
   }

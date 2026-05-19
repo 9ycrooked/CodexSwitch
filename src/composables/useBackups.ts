@@ -1,12 +1,13 @@
 import type { Ref } from "vue";
 import type { BackupSummary } from "../types";
 import * as api from "../api/codexSwitchApi";
+import type { ToastType } from "./useNotifications";
 
 export function useBackups(deps: {
   backups: Ref<BackupSummary[]>;
   activeOperation: Ref<string>;
   refreshAll: () => Promise<void>;
-  setMessage: (message: string, isError?: boolean) => void;
+  setMessage: (type: ToastType, message: string) => void;
 }) {
   async function runOperation(key: string, work: () => Promise<void>) {
     deps.activeOperation.value = key;
@@ -22,9 +23,9 @@ export function useBackups(deps: {
       try {
         const backup = await api.backupCurrentState();
         await deps.refreshAll();
-        deps.setMessage(`已创建备份 ${backup.id}。`);
+        deps.setMessage("success", `已创建备份 ${backup.id}。`);
       } catch (err) {
-        deps.setMessage(String(err), true);
+        deps.setMessage("error", String(err));
       }
     });
   }
@@ -36,9 +37,9 @@ export function useBackups(deps: {
       try {
         await api.restoreBackup(backup.id);
         await deps.refreshAll();
-        deps.setMessage(`已恢复备份 ${backup.id}。`);
+        deps.setMessage("success", `已恢复备份 ${backup.id}。`);
       } catch (err) {
-        deps.setMessage(String(err), true);
+        deps.setMessage("error", String(err));
       }
     });
   }

@@ -3,6 +3,7 @@ import { relaunch } from "@tauri-apps/plugin-process";
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import type { Settings, UpdatePolicy } from "../types";
 import { formatError } from "../utils/format";
+import type { ToastType } from "./useNotifications";
 
 const UPDATE_POLICY_URL = "https://github.com/9ycrooked/CodexSwitch/releases/latest/download/update-policy.json";
 
@@ -13,7 +14,7 @@ type UpdateInfo = Update & {
   currentVersion?: string;
 };
 
-export function useUpdater(settings: Settings, setMessage: (message: string, isError?: boolean) => void) {
+export function useUpdater(settings: Settings, setMessage: (type: ToastType, message: string) => void) {
   const updatePolicy = reactive<UpdatePolicy>({
     check_updates_on_startup: true,
     force_update_on_startup: false,
@@ -85,17 +86,16 @@ export function useUpdater(settings: Settings, setMessage: (message: string, isE
     try {
       const update = await check();
       if (!update) {
-        if (manual) setMessage("当前已经是最新版本。");
+        if (manual) setMessage("info", "当前已经是最新版本。");
         return;
       }
 
       pendingUpdate.value = markRaw(update);
       updateDialogOpen.value = true;
-      if (manual) setMessage("");
     } catch (err) {
       const message = `更新检查失败：${formatError(err)}`;
       updateError.value = message;
-      if (manual) setMessage(message, true);
+      if (manual) setMessage("error", message);
     } finally {
       updateChecking.value = false;
       lastUpdateCheckedAt.value = new Date().toISOString();

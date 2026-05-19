@@ -17,7 +17,7 @@ import ToastViewport from "./components/ToastViewport.vue";
 import UpdateDialog from "./components/UpdateDialog.vue";
 import { useAccounts } from "./composables/useAccounts";
 import { useBackups } from "./composables/useBackups";
-import { useNotifications } from "./composables/useNotifications";
+import { useNotifications, type ToastType } from "./composables/useNotifications";
 import { useQuota } from "./composables/useQuota";
 import { useUpdater } from "./composables/useUpdater";
 import { useWindowControls } from "./composables/useWindowControls";
@@ -71,12 +71,8 @@ function updateProcessNames(event: Event) {
   settings.process_names = (event.target as HTMLInputElement).value.split(",");
 }
 
-function setMessage(message: string, isError = false) {
-  if (isError) {
-    notifications.error(message);
-    return;
-  }
-  notifications.success(message);
+function setMessage(type: ToastType, message: string) {
+  notifications[type](message);
 }
 
 async function refreshAll() {
@@ -103,7 +99,7 @@ async function refreshAllWithBusy() {
   try {
     await refreshAll();
   } catch (err) {
-    setMessage(String(err), true);
+    setMessage("error", String(err));
   } finally {
     busy.value = false;
   }
@@ -203,12 +199,12 @@ async function saveSettings() {
     await refreshAll();
     try {
       await refreshAppInfo();
-      setMessage("设置已保存。");
+      setMessage("success", "设置已保存。");
     } catch (err) {
-      setMessage(`设置已保存，但应用信息刷新失败：${String(err)}`, true);
+      setMessage("warning", `设置已保存，但应用信息刷新失败：${String(err)}`);
     }
   } catch (err) {
-    setMessage(String(err), true);
+    setMessage("error", String(err));
   } finally {
     if (activeOperation.value === operationKey) activeOperation.value = "";
   }
@@ -219,9 +215,9 @@ async function runOpenDirectory(key: string, action: () => Promise<unknown>) {
   activeOperation.value = operationKey;
   try {
     await action();
-    setMessage("已打开目录。");
+    setMessage("info", "已打开目录。");
   } catch (err) {
-    setMessage(String(err), true);
+    setMessage("error", String(err));
   } finally {
     if (activeOperation.value === operationKey) activeOperation.value = "";
   }
@@ -240,14 +236,14 @@ onMounted(async () => {
     try {
       await refreshAppInfo();
     } catch (err) {
-      setMessage(String(err), true);
+      setMessage("error", String(err));
     }
     if (!selectedQuotaAccountId.value && accounts.value[0]) {
       selectedQuotaAccountId.value = accounts.value[0].id;
     }
     void runUpdateCheck();
   } catch (err) {
-    setMessage(String(err), true);
+    setMessage("error", String(err));
   } finally {
     busy.value = false;
   }
