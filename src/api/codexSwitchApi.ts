@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import type {
   AccountSummary,
   AppPaths,
+  AutoFlowOAuthServerStatus,
   BackupSummary,
   CodexState,
   NetworkExitCheckResult,
@@ -53,6 +54,22 @@ export function openBackupDir(backupId: string) {
 
 export function updateSettings(settings: Settings) {
   return invoke<Settings>("update_settings", { settings });
+}
+
+export function getAutoFlowOAuthServerStatus() {
+  return invoke<AutoFlowOAuthServerStatus>("get_autoflow_oauth_server_status");
+}
+
+export function startAutoFlowOAuthServer() {
+  return invoke<AutoFlowOAuthServerStatus>("start_autoflow_oauth_server");
+}
+
+export function stopAutoFlowOAuthServer() {
+  return invoke<AutoFlowOAuthServerStatus>("stop_autoflow_oauth_server");
+}
+
+export function resetAutoFlowOAuthAdminKey() {
+  return invoke<Settings>("reset_autoflow_oauth_admin_key");
 }
 
 export function importAccounts(paths: string[]) {

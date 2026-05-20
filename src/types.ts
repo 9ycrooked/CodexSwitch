@@ -96,6 +96,16 @@ export type Settings = {
   force_update_on_startup: boolean;
   check_oauth_network_on_login: boolean;
   check_egress_region: boolean;
+  autoflow_oauth_server_enabled: boolean;
+  autoflow_oauth_server_port: number;
+  autoflow_oauth_admin_key: string;
+};
+
+export type AutoFlowOAuthServerStatus = {
+  running: boolean;
+  port: number;
+  url: string;
+  admin_key_configured: boolean;
 };
 
 export type CodexState = {

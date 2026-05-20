@@ -1,7 +1,15 @@
 <script setup lang="ts">
 import { getVersion } from "@tauri-apps/api/app";
 import { computed, onMounted, reactive, ref } from "vue";
-import type { AccountSummary, AppPaths, BackupSummary, CodexState, NetworkExitCheckResult, Settings } from "./types";
+import type {
+  AccountSummary,
+  AppPaths,
+  AutoFlowOAuthServerStatus,
+  BackupSummary,
+  CodexState,
+  NetworkExitCheckResult,
+  Settings
+} from "./types";
 import * as api from "./api/codexSwitchApi";
 import {
   openAppStoreDir,
@@ -39,6 +47,8 @@ const appVersion = ref("");
 const appPaths = ref<AppPaths | null>(null);
 const networkCheckResult = ref<NetworkExitCheckResult | null>(null);
 const networkCheckRunning = ref(false);
+const autoFlowServerStatus = ref<AutoFlowOAuthServerStatus | null>(null);
+const autoFlowServerBusy = ref(false);
 
 const settings = reactive<Settings>({
   codex_home: "C:\\Users\\Y\\.codex",
@@ -51,7 +61,10 @@ const settings = reactive<Settings>({
   check_updates_on_startup: true,
   force_update_on_startup: false,
   check_oauth_network_on_login: true,
-  check_egress_region: false
+  check_egress_region: false,
+  autoflow_oauth_server_enabled: false,
+  autoflow_oauth_server_port: 8080,
+  autoflow_oauth_admin_key: ""
 });
 
 const notifications = useNotifications();
@@ -80,16 +93,18 @@ function setMessage(type: ToastType, message: string) {
 }
 
 async function refreshAll() {
-  const [nextAccounts, nextBackups, nextCurrent, nextSettings] = await Promise.all([
+  const [nextAccounts, nextBackups, nextCurrent, nextSettings, nextAutoFlowStatus] = await Promise.all([
     api.listAccounts(),
     api.listBackups(),
     api.readCurrentCodexState(),
-    api.readSettings()
+    api.readSettings(),
+    api.getAutoFlowOAuthServerStatus()
   ]);
   accounts.value = nextAccounts;
   backups.value = nextBackups;
   current.value = nextCurrent;
   Object.assign(settings, nextSettings);
+  autoFlowServerStatus.value = nextAutoFlowStatus;
 }
 
 async function refreshAppInfo() {
@@ -200,7 +215,10 @@ async function saveSettings() {
       check_updates_on_startup: settings.check_updates_on_startup,
       force_update_on_startup: settings.force_update_on_startup,
       check_oauth_network_on_login: settings.check_oauth_network_on_login,
-      check_egress_region: settings.check_egress_region
+      check_egress_region: settings.check_egress_region,
+      autoflow_oauth_server_enabled: Boolean(settings.autoflow_oauth_server_enabled),
+      autoflow_oauth_server_port: Number(settings.autoflow_oauth_server_port),
+      autoflow_oauth_admin_key: settings.autoflow_oauth_admin_key
     });
     Object.assign(settings, saved);
     await refreshAll();
@@ -229,6 +247,62 @@ async function checkNetworkExitManually() {
     setMessage("error", String(err));
   } finally {
     networkCheckRunning.value = false;
+  }
+}
+
+async function startAutoFlowServer() {
+  autoFlowServerBusy.value = true;
+  try {
+    const saved = await api.updateSettings({
+      ...settings,
+      autoflow_oauth_server_port: Number(settings.autoflow_oauth_server_port)
+    });
+    Object.assign(settings, saved);
+    autoFlowServerStatus.value = await api.startAutoFlowOAuthServer();
+    const refreshed = await api.readSettings();
+    Object.assign(settings, refreshed);
+    setMessage("success", "AutoFlow 接入服务已开启");
+  } catch (err) {
+    setMessage("error", String(err));
+  } finally {
+    autoFlowServerBusy.value = false;
+  }
+}
+
+async function stopAutoFlowServer() {
+  autoFlowServerBusy.value = true;
+  try {
+    autoFlowServerStatus.value = await api.stopAutoFlowOAuthServer();
+    const refreshed = await api.readSettings();
+    Object.assign(settings, refreshed);
+    setMessage("success", "AutoFlow 接入服务已关闭");
+  } catch (err) {
+    setMessage("error", String(err));
+  } finally {
+    autoFlowServerBusy.value = false;
+  }
+}
+
+async function resetAutoFlowAdminKey() {
+  autoFlowServerBusy.value = true;
+  try {
+    const saved = await api.resetAutoFlowOAuthAdminKey();
+    Object.assign(settings, saved);
+    autoFlowServerStatus.value = await api.getAutoFlowOAuthServerStatus();
+    setMessage("success", "AutoFlow 管理密钥已重置");
+  } catch (err) {
+    setMessage("error", String(err));
+  } finally {
+    autoFlowServerBusy.value = false;
+  }
+}
+
+async function copyAutoFlowText(value: string, label: string) {
+  try {
+    await navigator.clipboard.writeText(value);
+    setMessage("success", `${label}已复制`);
+  } catch (err) {
+    setMessage("error", `复制失败：${String(err)}`);
   }
 }
 
@@ -394,9 +468,21 @@ onMounted(async () => {
         :update-policy-error="updatePolicyError"
         :network-check-result="networkCheckResult"
         :network-check-running="networkCheckRunning"
+        :autoflow-server-status="autoFlowServerStatus"
+        :autoflow-server-busy="autoFlowServerBusy"
         @update-process-names="updateProcessNames"
         @check-for-updates="checkForUpdatesManually"
         @check-network-exit="checkNetworkExitManually"
+        @start-autoflow-server="startAutoFlowServer"
+        @stop-autoflow-server="stopAutoFlowServer"
+        @reset-autoflow-admin-key="resetAutoFlowAdminKey"
+        @copy-autoflow-service-url="
+          copyAutoFlowText(
+            autoFlowServerStatus?.url || `http://127.0.0.1:${settings.autoflow_oauth_server_port}/admin/accounts`,
+            'AutoFlow 地址'
+          )
+        "
+        @copy-autoflow-admin-key="copyAutoFlowText(settings.autoflow_oauth_admin_key, '管理密钥')"
         @save-settings="saveSettings"
         @open-codex-home="openCodexHome"
         @open-app-data="openAppData"

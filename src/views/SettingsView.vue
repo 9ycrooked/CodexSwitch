@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { AppPaths, NetworkExitCheckResult, Settings } from "../types";
+import type { AppPaths, AutoFlowOAuthServerStatus, NetworkExitCheckResult, Settings } from "../types";
 import { formatDate } from "../utils/format";
 
 defineProps<{
@@ -14,12 +14,19 @@ defineProps<{
   updatePolicyError: string;
   networkCheckResult: NetworkExitCheckResult | null;
   networkCheckRunning: boolean;
+  autoflowServerStatus: AutoFlowOAuthServerStatus | null;
+  autoflowServerBusy: boolean;
 }>();
 
 defineEmits<{
   updateProcessNames: [Event];
   checkForUpdates: [];
   checkNetworkExit: [];
+  startAutoflowServer: [];
+  stopAutoflowServer: [];
+  resetAutoflowAdminKey: [];
+  copyAutoflowServiceUrl: [];
+  copyAutoflowAdminKey: [];
   saveSettings: [];
   openCodexHome: [];
   openAppData: [];
@@ -31,6 +38,13 @@ function statusText(status: string) {
   if (status === "warning") return "警告";
   if (status === "failed") return "失败";
   return status;
+}
+
+function maskedKey(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return "尚未生成";
+  if (trimmed.length <= 12) return "••••••••";
+  return `${trimmed.slice(0, 6)}••••••${trimmed.slice(-4)}`;
 }
 </script>
 
@@ -85,6 +99,67 @@ function statusText(status: string) {
         <option value="embedded">内置 WebView2（实验）</option>
       </select>
     </label>
+    <section class="autoflow-integration-panel">
+      <div class="panel-heading-row">
+        <div>
+          <span class="eyebrow">AutoFlow</span>
+          <h3>自有软件 OAuth 接入服务</h3>
+          <p>按需开启本地接口，让 AutoFlow 用 Codex2API 协议添加 OAuth 账号。</p>
+        </div>
+        <span class="service-state" :class="{ running: autoflowServerStatus?.running }">
+          {{ autoflowServerStatus?.running ? "运行中" : "未开启" }}
+        </span>
+      </div>
+      <label class="form-group">
+        <span>接入服务端口</span>
+        <input
+          v-model.number="settings.autoflow_oauth_server_port"
+          type="number"
+          min="1024"
+          max="65535"
+          :disabled="autoflowServerStatus?.running || autoflowServerBusy"
+        />
+      </label>
+      <div class="service-field-row">
+        <span>AutoFlow 地址</span>
+        <code>{{ autoflowServerStatus?.url || `http://127.0.0.1:${settings.autoflow_oauth_server_port}/admin/accounts` }}</code>
+        <button class="secondary" type="button" :disabled="autoflowServerBusy" @click="$emit('copyAutoflowServiceUrl')">
+          复制
+        </button>
+      </div>
+      <div class="service-field-row">
+        <span>管理密钥</span>
+        <code>{{ maskedKey(settings.autoflow_oauth_admin_key) }}</code>
+        <button
+          class="secondary"
+          type="button"
+          :disabled="autoflowServerBusy || !settings.autoflow_oauth_admin_key"
+          @click="$emit('copyAutoflowAdminKey')"
+        >
+          复制
+        </button>
+        <button class="secondary" type="button" :disabled="autoflowServerBusy" @click="$emit('resetAutoflowAdminKey')">
+          重置
+        </button>
+      </div>
+      <div class="service-actions">
+        <button
+          type="button"
+          :disabled="busy || autoflowServerBusy || autoflowServerStatus?.running"
+          @click="$emit('startAutoflowServer')"
+        >
+          {{ autoflowServerBusy ? "处理中" : "开启接入服务" }}
+        </button>
+        <button
+          class="secondary"
+          type="button"
+          :disabled="busy || autoflowServerBusy || !autoflowServerStatus?.running"
+          @click="$emit('stopAutoflowServer')"
+        >
+          关闭接入服务
+        </button>
+      </div>
+    </section>
     <section class="network-check-panel">
       <div class="panel-heading-row">
         <div>

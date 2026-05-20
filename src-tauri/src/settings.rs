@@ -29,6 +29,12 @@ pub struct Settings {
     pub check_oauth_network_on_login: bool,
     #[serde(default)]
     pub check_egress_region: bool,
+    #[serde(default)]
+    pub autoflow_oauth_server_enabled: bool,
+    #[serde(default = "default_autoflow_oauth_server_port")]
+    pub autoflow_oauth_server_port: u16,
+    #[serde(default)]
+    pub autoflow_oauth_admin_key: String,
 }
 
 pub fn load_settings() -> AppResult<Settings> {
@@ -58,6 +64,9 @@ pub fn default_settings() -> Settings {
         force_update_on_startup: false,
         check_oauth_network_on_login: true,
         check_egress_region: false,
+        autoflow_oauth_server_enabled: false,
+        autoflow_oauth_server_port: default_autoflow_oauth_server_port(),
+        autoflow_oauth_admin_key: String::new(),
     }
 }
 
@@ -68,26 +77,40 @@ pub fn read_settings() -> AppResult<Settings> {
 
 #[tauri::command]
 pub fn update_settings(settings: Settings) -> AppResult<Settings> {
+    let sanitized = sanitize_settings(settings)?;
+    save_settings(&sanitized)?;
+    Ok(sanitized)
+}
+
+pub(crate) fn sanitize_settings(settings: Settings) -> AppResult<Settings> {
     if settings.codex_home.trim().is_empty() {
         return Err("Codex home 不能为空。".into());
-    }
-    if settings.process_names.is_empty() {
-        return Err("至少需要一个 Codex 进程名。".into());
     }
     if settings.close_timeout_ms < 500 {
         return Err("关闭超时不能小于 500ms。".into());
     }
+    if settings.oauth_callback_port < 1024 {
+        return Err("OAuth 回调端口不能小于 1024。".into());
+    }
+    if settings.autoflow_oauth_server_port < 1024 {
+        return Err("AutoFlow 接入服务端口不能小于 1024。".into());
+    }
 
-    let sanitized = Settings {
-        codex_home: settings.codex_home,
-        process_names: settings
-            .process_names
-            .into_iter()
-            .map(|name| name.trim().to_string())
-            .filter(|name| !name.is_empty())
-            .collect(),
+    let process_names: Vec<String> = settings
+        .process_names
+        .into_iter()
+        .map(|name| name.trim().to_string())
+        .filter(|name| !name.is_empty())
+        .collect();
+    if process_names.is_empty() {
+        return Err("至少需要一个 Codex 进程名。".into());
+    }
+
+    Ok(Settings {
+        codex_home: settings.codex_home.trim().to_string(),
+        process_names,
         close_timeout_ms: settings.close_timeout_ms,
-        browser_profile_dir: settings.browser_profile_dir,
+        browser_profile_dir: settings.browser_profile_dir.trim().to_string(),
         oauth_callback_port: settings.oauth_callback_port,
         keep_login_profiles: settings.keep_login_profiles,
         oauth_login_mode: sanitize_oauth_login_mode(&settings.oauth_login_mode),
@@ -95,9 +118,14 @@ pub fn update_settings(settings: Settings) -> AppResult<Settings> {
         force_update_on_startup: settings.force_update_on_startup,
         check_oauth_network_on_login: settings.check_oauth_network_on_login,
         check_egress_region: settings.check_egress_region,
-    };
-    atomic_write_json(&settings_path()?, &sanitized)?;
-    Ok(sanitized)
+        autoflow_oauth_server_enabled: settings.autoflow_oauth_server_enabled,
+        autoflow_oauth_server_port: settings.autoflow_oauth_server_port,
+        autoflow_oauth_admin_key: settings.autoflow_oauth_admin_key.trim().to_string(),
+    })
+}
+
+pub(crate) fn save_settings(settings: &Settings) -> AppResult<()> {
+    atomic_write_json(&settings_path()?, settings)
 }
 
 pub fn sanitize_oauth_login_mode(value: &str) -> String {
@@ -140,6 +168,10 @@ fn default_oauth_callback_port() -> u16 {
     1455
 }
 
+fn default_autoflow_oauth_server_port() -> u16 {
+    8080
+}
+
 fn default_keep_login_profiles() -> bool {
     true
 }
@@ -170,5 +202,34 @@ mod tests {
         assert!(!settings.force_update_on_startup);
         assert!(settings.check_oauth_network_on_login);
         assert!(!settings.check_egress_region);
+    }
+
+    #[test]
+    fn settings_defaults_autoflow_fields_when_missing() {
+        let raw = r#"{
+            "codex_home": "C:\\Users\\Y\\.codex",
+            "process_names": ["Codex.exe"],
+            "close_timeout_ms": 3000,
+            "browser_profile_dir": "profiles",
+            "oauth_callback_port": 1455,
+            "keep_login_profiles": true,
+            "oauth_login_mode": "external"
+        }"#;
+
+        let settings: Settings = serde_json::from_str(raw).expect("settings should deserialize");
+
+        assert!(!settings.autoflow_oauth_server_enabled);
+        assert_eq!(settings.autoflow_oauth_server_port, 8080);
+        assert_eq!(settings.autoflow_oauth_admin_key, "");
+    }
+
+    #[test]
+    fn update_settings_rejects_invalid_autoflow_port() {
+        let mut settings = default_settings();
+        settings.autoflow_oauth_server_port = 80;
+
+        let err = sanitize_settings(settings).expect_err("invalid port should be rejected");
+
+        assert_eq!(err, "AutoFlow 接入服务端口不能小于 1024。");
     }
 }
