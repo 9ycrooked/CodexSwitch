@@ -51,7 +51,10 @@ const settings = reactive<Settings>({
   check_updates_on_startup: true,
   force_update_on_startup: false,
   check_oauth_network_on_login: true,
-  check_egress_region: false
+  check_egress_region: false,
+  autoflow_oauth_server_enabled: false,
+  autoflow_oauth_server_port: 8080,
+  autoflow_oauth_admin_key: ""
 });
 
 const notifications = useNotifications();
@@ -200,7 +203,10 @@ async function saveSettings() {
       check_updates_on_startup: settings.check_updates_on_startup,
       force_update_on_startup: settings.force_update_on_startup,
       check_oauth_network_on_login: settings.check_oauth_network_on_login,
-      check_egress_region: settings.check_egress_region
+      check_egress_region: settings.check_egress_region,
+      autoflow_oauth_server_enabled: Boolean(settings.autoflow_oauth_server_enabled),
+      autoflow_oauth_server_port: Number(settings.autoflow_oauth_server_port),
+      autoflow_oauth_admin_key: settings.autoflow_oauth_admin_key
     });
     Object.assign(settings, saved);
     await refreshAll();
