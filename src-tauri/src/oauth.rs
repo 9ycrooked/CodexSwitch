@@ -237,18 +237,80 @@ fn complete_oauth_login_internal(callback_query: &str) -> AppResult<AccountSumma
     }
     let _window_label = pending.window_label.clone();
     let token = exchange_code_for_tokens(&code, &pending.redirect_uri, &pending.code_verifier)?;
-    let auth_json = auth_json_from_token_response(&token);
-    let mut summary = summary_from_auth_json(&auth_json, None);
+    save_token_response_as_account(
+        &token,
+        &pending.profile_id,
+        Some(pending.browser_profile_dir.to_string_lossy().to_string()),
+    )
+}
+
+pub(crate) fn account_summary_from_token_response(
+    token: &TokenResponse,
+    fallback_id: &str,
+    browser_profile_dir: Option<String>,
+) -> AppResult<AccountSummary> {
+    let auth_json = auth_json_from_token_response(token);
+    account_summary_from_auth_json(&auth_json, fallback_id, browser_profile_dir)
+}
+
+fn account_summary_from_auth_json(
+    auth_json: &Value,
+    fallback_id: &str,
+    browser_profile_dir: Option<String>,
+) -> AppResult<AccountSummary> {
+    let mut summary = summary_from_auth_json(auth_json, None);
+    if summary
+        .account_id
+        .as_deref()
+        .is_none_or(|account_id| account_id.trim().is_empty())
+    {
+        summary.account_id = summary
+            .oauth_metadata
+            .as_ref()
+            .and_then(|metadata| metadata.account_id.clone());
+    }
     summary.id = sanitize_id(
         &summary
             .account_id
             .clone()
             .or(summary.email.clone())
-            .unwrap_or_else(|| pending.profile_id.clone()),
+            .unwrap_or_else(|| fallback_id.to_string()),
     );
-    summary.browser_profile_dir = Some(pending.browser_profile_dir.to_string_lossy().to_string());
+    summary.browser_profile_dir = browser_profile_dir;
     summary.imported_at = now_string();
     summary.has_config = false;
+    Ok(summary)
+}
+
+fn sync_auth_json_account_id(auth_json: &mut Value, summary: &AccountSummary) {
+    let Some(account_id) = summary
+        .account_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|account_id| !account_id.is_empty())
+    else {
+        return;
+    };
+    let Some(tokens) = auth_json.get_mut("tokens").and_then(Value::as_object_mut) else {
+        return;
+    };
+    let should_update = tokens
+        .get("account_id")
+        .and_then(Value::as_str)
+        .is_none_or(|value| value.trim().is_empty());
+    if should_update {
+        tokens.insert("account_id".to_string(), Value::String(account_id.to_string()));
+    }
+}
+
+pub(crate) fn save_token_response_as_account(
+    token: &TokenResponse,
+    fallback_id: &str,
+    browser_profile_dir: Option<String>,
+) -> AppResult<AccountSummary> {
+    let mut auth_json = auth_json_from_token_response(token);
+    let summary = account_summary_from_auth_json(&auth_json, fallback_id, browser_profile_dir)?;
+    sync_auth_json_account_id(&mut auth_json, &summary);
     let original = flat_oauth_json_from_auth_json(&auth_json, &summary);
     save_account_record(&summary, &auth_json, &original)?;
     Ok(summary)
@@ -258,7 +320,7 @@ fn oauth_pending() -> &'static Mutex<Option<OAuthPending>> {
     OAUTH_PENDING.get_or_init(|| Mutex::new(None))
 }
 
-fn generate_pkce_codes() -> (String, String) {
+pub(crate) fn generate_pkce_codes() -> (String, String) {
     let mut bytes = [0_u8; 96];
     rand::thread_rng().fill_bytes(&mut bytes);
     let verifier = URL_SAFE_NO_PAD.encode(bytes);
@@ -266,7 +328,7 @@ fn generate_pkce_codes() -> (String, String) {
     (verifier, challenge)
 }
 
-fn build_oauth_url(redirect_uri: &str, state: &str, code_challenge: &str) -> String {
+pub(crate) fn build_oauth_url(redirect_uri: &str, state: &str, code_challenge: &str) -> String {
     let params = [
         ("client_id", OAUTH_CLIENT_ID),
         ("response_type", "code"),
@@ -350,7 +412,7 @@ fn oauth_external_window_size(app: &AppHandle) -> (u32, u32) {
         .unwrap_or((1120, 760))
 }
 
-fn exchange_code_for_tokens(
+pub(crate) fn exchange_code_for_tokens(
     code: &str,
     redirect_uri: &str,
     code_verifier: &str,
@@ -418,7 +480,7 @@ fn parse_token_http_response(
     serde_json::from_str(&body).map_err(|err| format!("{label} 响应解析失败：{err}"))
 }
 
-fn flat_oauth_json_from_auth_json(auth_json: &Value, summary: &AccountSummary) -> Value {
+pub(crate) fn flat_oauth_json_from_auth_json(auth_json: &Value, summary: &AccountSummary) -> Value {
     json!({
         "access_token": auth_json.pointer("/tokens/access_token").and_then(Value::as_str).unwrap_or_default(),
         "id_token": auth_json.pointer("/tokens/id_token").and_then(Value::as_str).unwrap_or_default(),
@@ -475,6 +537,60 @@ mod tests {
         assert_eq!(parsed.get("state").map(String::as_str), Some("state-1"));
         let query = extract_query_from_request_line("GET /auth/callback?code=abc&state=s HTTP/1.1");
         assert_eq!(query.as_deref(), Some("code=abc&state=s"));
+    }
+
+    #[test]
+    fn saves_token_response_as_account_summary() {
+        let claims = json!({
+            "email": "autoflow@example.com",
+            "https://api.openai.com/auth": {
+                "chatgpt_account_id": "acct-autoflow",
+                "chatgpt_plan_type": "plus"
+            }
+        });
+        let payload = URL_SAFE_NO_PAD.encode(serde_json::to_vec(&claims).unwrap());
+        let token = TokenResponse {
+            access_token: "access-token".to_string(),
+            refresh_token: "refresh-token".to_string(),
+            id_token: format!("header.{payload}.sig"),
+            expires_in: 3600,
+        };
+
+        let summary = account_summary_from_token_response(&token, "fallback-profile", None)
+            .expect("summary should be generated");
+
+        assert_eq!(summary.id, "acct-autoflow");
+        assert_eq!(summary.email.as_deref(), Some("autoflow@example.com"));
+        assert_eq!(summary.account_id.as_deref(), Some("acct-autoflow"));
+        assert_eq!(summary.plan.as_deref(), Some("plus"));
+    }
+
+    #[test]
+    fn fills_auth_json_account_id_from_summary_metadata() {
+        let claims = json!({
+            "email": "autoflow@example.com",
+            "https://api.openai.com/auth": {
+                "chatgpt_account_id": "acct-autoflow",
+                "chatgpt_plan_type": "plus"
+            }
+        });
+        let payload = URL_SAFE_NO_PAD.encode(serde_json::to_vec(&claims).unwrap());
+        let token = TokenResponse {
+            access_token: "access-token".to_string(),
+            refresh_token: "refresh-token".to_string(),
+            id_token: format!("header.{payload}.sig"),
+            expires_in: 3600,
+        };
+        let mut auth_json = auth_json_from_token_response(&token);
+        let summary = account_summary_from_auth_json(&auth_json, "fallback-profile", None)
+            .expect("summary should be generated");
+
+        sync_auth_json_account_id(&mut auth_json, &summary);
+
+        assert_eq!(
+            auth_json.pointer("/tokens/account_id").and_then(Value::as_str),
+            Some("acct-autoflow")
+        );
     }
 
     #[test]
