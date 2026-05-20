@@ -22,7 +22,6 @@ defineProps<{
 
 defineEmits<{
   "update:query": [string];
-  switchAccount: [AccountSummary];
   refreshTokens: [AccountSummary];
   selectQuotaAccount: [AccountSummary];
   deleteAccount: [AccountSummary];
@@ -66,7 +65,6 @@ function inputValue(event: Event) {
                   </span>
                 </div>
                 <h3 class="file-name">{{ account.display_name }}</h3>
-                <p class="file-description">{{ account.email || account.account_id || "无账号标识" }}</p>
               </div>
             </div>
 
@@ -106,21 +104,12 @@ function inputValue(event: Event) {
             </div>
 
             <div class="card-actions">
-              <button
-                class="primary-action-button"
-                :disabled="busy || isCurrentAccount(account, current) || isOperationActive('switch:' + account.id)"
-                @click="$emit('switchAccount', account)"
-              >
-                切换
+              <button class="primary-action-button" :disabled="busy" @click="$emit('selectQuotaAccount', account)">
+                查看额度
               </button>
-              <button
-                class="secondary"
-                :disabled="busy || isOperationActive('refresh-token:' + account.id)"
-                @click="$emit('refreshTokens', account)"
-              >
+              <button :disabled="busy || isOperationActive('refresh-token:' + account.id)" @click="$emit('refreshTokens', account)">
                 刷新认证
               </button>
-              <button class="secondary" :disabled="busy" @click="$emit('selectQuotaAccount', account)">查看额度</button>
               <button
                 class="secondary danger-button"
                 :disabled="busy || isOperationActive('delete:' + account.id)"

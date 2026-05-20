@@ -10,7 +10,8 @@ import {
   usageResetLabel,
   usageWindowClass,
   usageWindowPercentClass,
-  usageWindowWidth
+  usageWindowWidth,
+  isCurrentAccount
 } from "../utils/format";
 
 defineProps<{
@@ -30,6 +31,7 @@ defineEmits<{
   fetchAllUsage: [];
   refreshTokens: [AccountSummary];
   clearUsage: [AccountSummary];
+  switchAccount: [AccountSummary];
 }>();
 </script>
 
@@ -127,6 +129,19 @@ defineEmits<{
         </div>
 
         <div class="quota-card-actions">
+          <button
+            class="primary-action-button"
+            :disabled="
+              busy ||
+              account.disabled ||
+              hasActiveOperation ||
+              isCurrentAccount(account, current) ||
+              isOperationActive('switch:' + account.id)
+            "
+            @click.stop="$emit('switchAccount', account)"
+          >
+            {{ isCurrentAccount(account, current) ? "当前账号" : "切换到此账号" }}
+          </button>
           <button
             class="secondary"
             :disabled="busy || isOperationActive('quota:all') || isOperationActive('refresh-token:' + account.id)"

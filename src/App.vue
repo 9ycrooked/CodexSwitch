@@ -506,7 +506,6 @@ onMounted(async () => {
         :busy="busy"
         :is-operation-active="isOperationActive"
         :has-active-operation="hasActiveOperation"
-        @switch-account="switchAccount"
         @refresh-tokens="refreshTokens"
         @select-quota-account="selectQuotaAccount"
         @delete-account="requestDeleteAccount"
@@ -526,6 +525,7 @@ onMounted(async () => {
         @fetch-all-usage="fetchAllUsage"
         @refresh-tokens="refreshTokens"
         @clear-usage="clearUsage"
+        @switch-account="switchAccount"
       />
 
       <BackupsView
