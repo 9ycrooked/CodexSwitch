@@ -33,6 +33,7 @@ pnpm-debug.log*
 Thumbs.db
 .idea/
 .vscode/
+logo.psd
 
 # Local reference projects kept beside this app
 CLIProxyAPI/
