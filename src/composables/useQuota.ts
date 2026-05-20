@@ -69,17 +69,9 @@ export function useQuota(deps: {
     }
 
     await runOperation("quota:all", async () => {
-      let succeeded = 0;
-      let failed = 0;
-
-      for (const account of targets) {
-        try {
-          await api.fetchCodexUsage(account.id);
-          succeeded += 1;
-        } catch {
-          failed += 1;
-        }
-      }
+      const results = await Promise.allSettled(targets.map((account) => api.fetchCodexUsage(account.id)));
+      const succeeded = results.filter((result) => result.status === "fulfilled").length;
+      const failed = results.length - succeeded;
 
       await deps.refreshAll();
       deps.setMessage(failed > 0 ? "warning" : "success", `全部额度检查完成：成功 ${succeeded} 个，失败 ${failed} 个`);
