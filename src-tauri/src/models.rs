@@ -82,6 +82,27 @@ pub struct OAuthLoginStart {
     pub mode: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AutoFlowOAuthServerStatus {
+    pub running: bool,
+    pub port: u16,
+    pub url: String,
+    pub admin_key_configured: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AutoFlowGenerateAuthUrlResponse {
+    pub auth_url: String,
+    pub session_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AutoFlowExchangeCodeResponse {
+    pub message: String,
+    pub id: String,
+    pub email: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct QuotaState {
     pub status: String,

@@ -1,4 +1,5 @@
 mod accounts;
+mod autoflow_oauth_server;
 mod backups;
 mod codex_home;
 mod commands;
@@ -28,6 +29,10 @@ pub fn run() {
             oauth::close_oauth_login,
             oauth::complete_oauth_login,
             oauth::refresh_account_tokens,
+            autoflow_oauth_server::start_autoflow_oauth_server,
+            autoflow_oauth_server::stop_autoflow_oauth_server,
+            autoflow_oauth_server::get_autoflow_oauth_server_status,
+            autoflow_oauth_server::reset_autoflow_oauth_admin_key,
             network_check::check_oauth_network_exit,
             quota::check_account_quota,
             quota::list_quota_states,
