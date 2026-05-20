@@ -213,8 +213,8 @@ function maskedKey(value: string) {
         <div class="panel-heading-row">
           <div>
             <span class="eyebrow">AutoFlow</span>
-            <h3>自有软件 OAuth 接入服务</h3>
-            <p>让 AutoFlow 通过 Codex2API 协议添加 OAuth 账号。</p>
+            <h3>OAuth 接入服务</h3>
+            <p>通过 Codex2API 协议添加 OAuth 账号。</p>
           </div>
           <span class="service-state" :class="{ running: autoflowServerStatus?.running }">
             {{ autoflowServerStatus?.running ? "运行中" : "未开启" }}
