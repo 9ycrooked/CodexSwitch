@@ -244,6 +244,7 @@ fn complete_oauth_login_internal(callback_query: &str) -> AppResult<AccountSumma
     )
 }
 
+#[allow(dead_code)]
 pub(crate) fn account_summary_from_token_response(
     token: &TokenResponse,
     fallback_id: &str,

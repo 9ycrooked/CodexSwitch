@@ -88,11 +88,16 @@ pub fn reset_autoflow_oauth_admin_key() -> AppResult<Settings> {
 
 fn start_autoflow_oauth_server_blocking() -> AppResult<AutoFlowOAuthServerStatus> {
     let mut settings = sanitize_settings(load_settings()?)?;
-    {
+    let already_running = {
         let state = server_state().lock().map_err(|err| err.to_string())?;
-        if state.is_some() {
-            return Ok(status_from_state(&settings));
+        state.is_some()
+    };
+    if already_running {
+        if !settings.autoflow_oauth_server_enabled {
+            settings.autoflow_oauth_server_enabled = true;
+            save_settings(&settings)?;
         }
+        return Ok(status_from_state(&settings));
     }
 
     if settings.autoflow_oauth_admin_key.trim().is_empty() {
@@ -105,12 +110,9 @@ fn start_autoflow_oauth_server_blocking() -> AppResult<AutoFlowOAuthServerStatus
         .set_nonblocking(true)
         .map_err(|err| format!("AutoFlow OAuth 服务初始化失败：{err}"))?;
 
-    let admin_key = settings.autoflow_oauth_admin_key.clone();
-    let callback_port = settings.oauth_callback_port;
     let cancel = Arc::new(AtomicBool::new(false));
     let thread_cancel = cancel.clone();
-    let join =
-        thread::spawn(move || run_server_loop(listener, thread_cancel, admin_key, callback_port));
+    let join = thread::spawn(move || run_server_loop(listener, thread_cancel));
 
     {
         let mut state = server_state().lock().map_err(|err| err.to_string())?;
@@ -164,17 +166,19 @@ fn status_from_state(settings: &Settings) -> AutoFlowOAuthServerStatus {
     }
 }
 
-fn run_server_loop(
-    listener: TcpListener,
-    cancel: Arc<AtomicBool>,
-    admin_key: String,
-    callback_port: u16,
-) {
+fn run_server_loop(listener: TcpListener, cancel: Arc<AtomicBool>) {
     while !cancel.load(Ordering::Relaxed) {
         match listener.accept() {
             Ok((mut stream, _addr)) => {
                 let response = match read_http_request(&mut stream) {
-                    Ok(request) => handle_http_request(request, &admin_key, callback_port),
+                    Ok(request) => match load_settings().and_then(sanitize_settings) {
+                        Ok(settings) => handle_http_request(
+                            request,
+                            &settings.autoflow_oauth_admin_key,
+                            settings.oauth_callback_port,
+                        ),
+                        Err(err) => json_error(500, &err),
+                    },
                     Err(err) => json_error(400, &err),
                 };
                 let _ = stream.write_all(&response.to_bytes());
@@ -407,7 +411,7 @@ where
         return Err("OAuth state 校验失败。".to_string());
     }
 
-    let token = exchange_fn(code, &session.redirect_uri, &session.code_verifier)?;
+    let token = exchange_fn(code.trim(), &session.redirect_uri, &session.code_verifier)?;
     let fallback_id = format!("autoflow-{}", Uuid::new_v4().simple());
     let account = save_fn(&token, &fallback_id, None)?;
     session.used = true;
@@ -432,7 +436,7 @@ fn json_response<T: serde::Serialize>(status: u16, payload: &T) -> HttpResponse 
 fn json_error(status: u16, message: &str) -> HttpResponse {
     HttpResponse {
         status,
-        body: json!({ "error": message }).to_string(),
+        body: json!({ "message": message }).to_string(),
     }
 }
 
@@ -630,7 +634,7 @@ mod tests {
         let response = exchange_code_for_sessions(
             &mut sessions,
             "sess_ok",
-            "code-1",
+            " code-1 ",
             "state",
             Instant::now(),
             |code, redirect_uri, verifier| {
@@ -702,6 +706,7 @@ mod tests {
             1455,
         );
         assert_eq!(bad_method.status, 405);
+        assert!(bad_method.body.contains("\"message\""));
         let raw = String::from_utf8(bad_method.to_bytes()).expect("response is utf8");
         assert!(raw.contains("Content-Type: application/json; charset=utf-8"));
 
