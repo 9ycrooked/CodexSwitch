@@ -641,6 +641,81 @@ dd {
   line-height: 1.5;
 }
 
+.autoflow-integration-panel {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 13px;
+  background: var(--bg-tertiary);
+  animation: fade-in-up 260ms ease both;
+}
+
+.panel-heading-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.panel-heading-row h3 {
+  margin-top: 4px;
+  font-size: 15px;
+}
+
+.panel-heading-row p {
+  margin-top: 6px;
+  color: var(--text-secondary);
+  line-height: 1.55;
+}
+
+.service-state {
+  flex: 0 0 auto;
+  border: 1px solid var(--warning-border);
+  border-radius: 6px;
+  padding: 5px 8px;
+  color: var(--warning-text);
+  background: var(--warning-bg);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.service-state.running {
+  border-color: var(--success-badge-border);
+  color: var(--success-badge-text);
+  background: var(--success-badge-bg);
+}
+
+.service-field-row,
+.service-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.service-field-row > span {
+  min-width: 84px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.service-field-row code {
+  flex: 1 1 260px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  border: 1px solid color-mix(in srgb, var(--border-color) 70%, transparent);
+  border-radius: 7px;
+  padding: 7px 9px;
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 12px;
+}
+
 @keyframes fade-in-up {
   from {
     opacity: 0;

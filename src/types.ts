@@ -101,6 +101,13 @@ export type Settings = {
   autoflow_oauth_admin_key: string;
 };
 
+export type AutoFlowOAuthServerStatus = {
+  running: boolean;
+  port: number;
+  url: string;
+  admin_key_configured: boolean;
+};
+
 export type CodexState = {
   codex_home: string;
   auth_exists: boolean;
