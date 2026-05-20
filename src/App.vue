@@ -83,6 +83,8 @@ const filteredAccounts = computed(() => {
   });
 });
 const hasActiveOperation = computed(() => Boolean(activeOperation.value));
+const showTopbarRefresh = computed(() => selectedTab.value === "accounts" || selectedTab.value === "backups");
+const topbarRefreshLabel = computed(() => (selectedTab.value === "backups" ? "刷新备份" : "刷新账号"));
 const settingsDirty = computed(() => {
   return savedSettingsSnapshot.value !== "" && savedSettingsSnapshot.value !== settingsSnapshot(settings);
 });
@@ -449,12 +451,12 @@ onMounted(async () => {
           <h2 v-else>设置</h2>
         </div>
         <div class="actions">
-          <button class="secondary" :disabled="busy" @click="refreshAllWithBusy">
+          <button v-if="showTopbarRefresh" class="secondary" :disabled="busy" @click="refreshAllWithBusy">
             <svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true">
               <path d="M21 12a9 9 0 1 1-2.64-6.36" />
               <path d="M21 3v6h-6" />
             </svg>
-            <span>刷新</span>
+            <span>{{ topbarRefreshLabel }}</span>
           </button>
           <button
             v-if="selectedTab === 'accounts'"
