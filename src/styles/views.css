@@ -572,14 +572,19 @@ dd {
 }
 
 .settings {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 1fr;
+  align-content: start;
 }
 
 .settings .form-group,
 .settings .checkbox-row,
+.settings-nav,
+.settings-section,
+.settings-section-header,
+.settings-section-card,
 .update-settings-panel,
 .warning,
-.settings > button {
+.settings-save-bar {
   animation: fade-in-up 260ms ease both;
 }
 
@@ -594,9 +599,13 @@ dd {
 }
 
 .settings .checkbox-row,
+.settings-section,
+.settings-section-header,
+.settings-section-card,
+.settings-section-grid > .full,
 .update-settings-panel,
 .warning,
-.settings > button {
+.settings-save-bar {
   grid-column: 1 / -1;
 }
 
@@ -610,6 +619,100 @@ dd {
   width: 18px;
   min-height: 18px;
   accent-color: var(--success-color);
+}
+
+.settings-nav {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 72%, transparent);
+  border-radius: var(--radius-md);
+  padding: 8px;
+  background: color-mix(in srgb, var(--bg-secondary) 54%, transparent);
+}
+
+.settings-nav button {
+  display: grid;
+  align-content: center;
+  justify-items: start;
+  gap: 4px;
+  min-height: 48px;
+  border-radius: 8px;
+  padding: 8px 10px;
+  text-align: left;
+  color: var(--text-secondary);
+  background: transparent;
+}
+
+.settings-nav button:hover:not(:disabled),
+.settings-nav button.active {
+  border-color: color-mix(in srgb, var(--primary-color) 35%, var(--border-color));
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--bg-tertiary) 82%, var(--primary-color) 6%);
+}
+
+.settings-nav button strong {
+  font-size: 13px;
+}
+
+.settings-nav button span {
+  color: var(--text-tertiary);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.settings-section {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.settings-section-header {
+  border: 1px solid color-mix(in srgb, var(--border-color) 60%, transparent);
+  border-radius: var(--radius-md);
+  padding: 13px;
+  background: color-mix(in srgb, var(--bg-secondary) 45%, transparent);
+}
+
+.settings-section-header h3 {
+  margin-top: 4px;
+  font-size: 16px;
+}
+
+.settings-section-header p {
+  margin-top: 6px;
+  color: var(--text-tertiary);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.settings-section-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  min-width: 0;
+}
+
+.settings-section-grid .form-group,
+.settings-section-grid .checkbox-row {
+  border: 1px solid color-mix(in srgb, var(--border-color) 70%, transparent);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  background: color-mix(in srgb, var(--bg-secondary) 42%, transparent);
+}
+
+.settings-section-grid .form-group small {
+  color: var(--text-tertiary);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+.settings-section-card {
+  border: 1px solid color-mix(in srgb, var(--border-color) 70%, transparent);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  background: color-mix(in srgb, var(--bg-secondary) 34%, transparent);
 }
 
 .update-settings-panel {
@@ -716,6 +819,45 @@ dd {
   font-size: 12px;
 }
 
+.settings-save-bar {
+  position: sticky;
+  bottom: 14px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  border: 1px solid color-mix(in srgb, var(--success-color) 42%, var(--border-color));
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  color: var(--text-primary);
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--success-color) 12%, transparent), transparent 62%),
+    color-mix(in srgb, var(--bg-primary) 94%, transparent);
+  box-shadow: var(--shadow-lg);
+  backdrop-filter: blur(16px);
+}
+
+.settings-save-bar div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.settings-save-bar strong {
+  font-size: 14px;
+}
+
+.settings-save-bar span {
+  color: var(--text-tertiary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.settings-save-bar button {
+  flex: 0 0 auto;
+}
+
 @keyframes fade-in-up {
   from {
     opacity: 0;
@@ -777,12 +919,13 @@ dd {
     margin-top: 0;
   }
 
-  .settings {
-    grid-template-columns: 1fr;
-  }
-
   .quota-detail-meta {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .settings-nav,
+  .settings-section-grid {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -850,6 +993,15 @@ dd {
 
   .quota-account-option > .quota-percent {
     grid-column: 2;
+  }
+
+  .settings-save-bar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .settings-save-bar button {
+    width: 100%;
   }
 }
 

@@ -69,6 +69,7 @@ const settings = reactive<Settings>({
   autoflow_oauth_server_port: 8080,
   autoflow_oauth_admin_key: ""
 });
+const savedSettingsSnapshot = ref(settingsSnapshot(settings));
 
 const notifications = useNotifications();
 
@@ -82,6 +83,48 @@ const filteredAccounts = computed(() => {
   });
 });
 const hasActiveOperation = computed(() => Boolean(activeOperation.value));
+const settingsDirty = computed(() => {
+  return savedSettingsSnapshot.value !== "" && savedSettingsSnapshot.value !== settingsSnapshot(settings);
+});
+
+function settingsSnapshot(value: Settings) {
+  return JSON.stringify({
+    codex_home: value.codex_home,
+    process_names: value.process_names,
+    close_timeout_ms: value.close_timeout_ms,
+    browser_profile_dir: value.browser_profile_dir,
+    oauth_callback_port: value.oauth_callback_port,
+    keep_login_profiles: value.keep_login_profiles,
+    oauth_login_mode: value.oauth_login_mode,
+    check_updates_on_startup: value.check_updates_on_startup,
+    force_update_on_startup: value.force_update_on_startup,
+    check_oauth_network_on_login: value.check_oauth_network_on_login,
+    check_egress_region: value.check_egress_region,
+    autoflow_oauth_server_enabled: value.autoflow_oauth_server_enabled,
+    autoflow_oauth_server_port: value.autoflow_oauth_server_port,
+    autoflow_oauth_admin_key: value.autoflow_oauth_admin_key
+  });
+}
+
+function applySettings(nextSettings: Settings) {
+  Object.assign(settings, nextSettings);
+  savedSettingsSnapshot.value = settingsSnapshot(nextSettings);
+}
+
+function applySettingsFromAsync(
+  nextSettings: Settings,
+  startedWithSnapshot: string,
+  fieldsToMirror: Array<keyof Settings> = []
+) {
+  if (settingsSnapshot(settings) === startedWithSnapshot) {
+    applySettings(nextSettings);
+    return;
+  }
+  savedSettingsSnapshot.value = settingsSnapshot(nextSettings);
+  for (const field of fieldsToMirror) {
+    settings[field] = nextSettings[field] as never;
+  }
+}
 
 function isOperationActive(key: string) {
   return activeOperation.value === key;
@@ -106,7 +149,9 @@ async function refreshAll() {
   accounts.value = nextAccounts;
   backups.value = nextBackups;
   current.value = nextCurrent;
-  Object.assign(settings, nextSettings);
+  if (!settingsDirty.value) {
+    applySettings(nextSettings);
+  }
   autoFlowServerStatus.value = nextAutoFlowStatus;
 }
 
@@ -244,7 +289,7 @@ async function saveSettings() {
       autoflow_oauth_server_port: Number(settings.autoflow_oauth_server_port),
       autoflow_oauth_admin_key: settings.autoflow_oauth_admin_key
     });
-    Object.assign(settings, saved);
+    applySettings(saved);
     await refreshAll();
     try {
       await refreshAppInfo();
@@ -276,15 +321,22 @@ async function checkNetworkExitManually() {
 
 async function startAutoFlowServer() {
   autoFlowServerBusy.value = true;
+  const startedWithSnapshot = settingsSnapshot(settings);
   try {
     const saved = await api.updateSettings({
       ...settings,
       autoflow_oauth_server_port: Number(settings.autoflow_oauth_server_port)
     });
-    Object.assign(settings, saved);
+    applySettingsFromAsync(saved, startedWithSnapshot, [
+      "autoflow_oauth_admin_key",
+      "autoflow_oauth_server_enabled"
+    ]);
     autoFlowServerStatus.value = await api.startAutoFlowOAuthServer();
     const refreshed = await api.readSettings();
-    Object.assign(settings, refreshed);
+    applySettingsFromAsync(refreshed, startedWithSnapshot, [
+      "autoflow_oauth_admin_key",
+      "autoflow_oauth_server_enabled"
+    ]);
     setMessage("success", "AutoFlow 接入服务已开启");
   } catch (err) {
     setMessage("error", String(err));
@@ -295,10 +347,14 @@ async function startAutoFlowServer() {
 
 async function stopAutoFlowServer() {
   autoFlowServerBusy.value = true;
+  const startedWithSnapshot = settingsSnapshot(settings);
   try {
     autoFlowServerStatus.value = await api.stopAutoFlowOAuthServer();
     const refreshed = await api.readSettings();
-    Object.assign(settings, refreshed);
+    applySettingsFromAsync(refreshed, startedWithSnapshot, [
+      "autoflow_oauth_admin_key",
+      "autoflow_oauth_server_enabled"
+    ]);
     setMessage("success", "AutoFlow 接入服务已关闭");
   } catch (err) {
     setMessage("error", String(err));
@@ -309,9 +365,10 @@ async function stopAutoFlowServer() {
 
 async function resetAutoFlowAdminKey() {
   autoFlowServerBusy.value = true;
+  const startedWithSnapshot = settingsSnapshot(settings);
   try {
     const saved = await api.resetAutoFlowOAuthAdminKey();
-    Object.assign(settings, saved);
+    applySettingsFromAsync(saved, startedWithSnapshot, ["autoflow_oauth_admin_key"]);
     autoFlowServerStatus.value = await api.getAutoFlowOAuthServerStatus();
     setMessage("success", "AutoFlow 管理密钥已重置");
   } catch (err) {
@@ -487,6 +544,7 @@ onMounted(async () => {
         :app-paths="appPaths"
         :last-update-checked-at="lastUpdateCheckedAt"
         :busy="busy || isOperationActive('settings:save')"
+        :settings-dirty="settingsDirty"
         :update-checking="updateChecking"
         :update-downloading="updateDownloading"
         :update-policy-source="updatePolicySource"
