@@ -25,6 +25,7 @@ defineEmits<{
   switchAccount: [AccountSummary];
   refreshTokens: [AccountSummary];
   selectQuotaAccount: [AccountSummary];
+  deleteAccount: [AccountSummary];
 }>();
 
 function inputValue(event: Event) {
@@ -120,6 +121,13 @@ function inputValue(event: Event) {
                 刷新认证
               </button>
               <button class="secondary" :disabled="busy" @click="$emit('selectQuotaAccount', account)">查看额度</button>
+              <button
+                class="secondary danger-button"
+                :disabled="busy || isOperationActive('delete:' + account.id)"
+                @click="$emit('deleteAccount', account)"
+              >
+                删除
+              </button>
             </div>
           </div>
         </div>

@@ -16,6 +16,11 @@ pub async fn import_accounts(paths: Vec<String>) -> AppResult<Vec<AccountSummary
     run_blocking(move || import_accounts_blocking(paths)).await
 }
 
+#[tauri::command]
+pub async fn delete_account(account_id: String, delete_profile: bool) -> AppResult<()> {
+    run_blocking(move || delete_account_blocking(account_id, delete_profile)).await
+}
+
 fn import_accounts_blocking(paths: Vec<String>) -> AppResult<Vec<AccountSummary>> {
     if paths.is_empty() {
         return Err("请选择至少一个账号文件。".into());
@@ -53,6 +58,52 @@ fn import_accounts_blocking(paths: Vec<String>) -> AppResult<Vec<AccountSummary>
     }
 
     Ok(imported)
+}
+
+fn delete_account_blocking(account_id: String, delete_profile: bool) -> AppResult<()> {
+    let account = load_account(&account_id)?;
+    let account_path = account_dir(&account_id)?;
+    let accounts_root = app_store_dir()?.join("accounts");
+    ensure_child_path(&accounts_root, &account_path, "账号目录")?;
+
+    if delete_profile {
+        if let Some(profile_dir) = account.summary.browser_profile_dir.as_deref() {
+            let profile_path = PathBuf::from(profile_dir);
+            if profile_path.exists() {
+                let profile_root = load_settings()?.browser_profile_dir;
+                let profile_root = PathBuf::from(profile_root);
+                ensure_child_path(&profile_root, &profile_path, "Profile 目录")?;
+                fs::remove_dir_all(&profile_path).map_err(stringify_io)?;
+            }
+        }
+    }
+
+    if account_path.exists() {
+        fs::remove_dir_all(account_path).map_err(stringify_io)?;
+    }
+    Ok(())
+}
+
+fn ensure_child_path(root: &PathBuf, target: &PathBuf, label: &str) -> AppResult<()> {
+    let root = root.canonicalize().map_err(stringify_io)?;
+    let target = if target.exists() {
+        target.canonicalize().map_err(stringify_io)?
+    } else {
+        target
+            .parent()
+            .ok_or_else(|| format!("{label} 路径无效。"))?
+            .canonicalize()
+            .map_err(stringify_io)?
+            .join(
+                target
+                    .file_name()
+                    .ok_or_else(|| format!("{label} 路径无效。"))?,
+            )
+    };
+    if !target.starts_with(&root) {
+        return Err(format!("{label} 不在允许删除的目录内。"));
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -95,4 +146,30 @@ fn switch_account_blocking(account_id: String) -> AppResult<SwitchResult> {
         backup_id: backup.id,
         warnings,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn allows_delete_target_inside_root() {
+        let temp = tempfile::tempdir().unwrap();
+        let root = temp.path().join("accounts");
+        let target = root.join("account-1");
+        fs::create_dir_all(&target).unwrap();
+
+        assert!(ensure_child_path(&root, &target, "账号目录").is_ok());
+    }
+
+    #[test]
+    fn rejects_delete_target_outside_root() {
+        let temp = tempfile::tempdir().unwrap();
+        let root = temp.path().join("accounts");
+        let target = temp.path().join("profiles").join("account-1");
+        fs::create_dir_all(&root).unwrap();
+        fs::create_dir_all(&target).unwrap();
+
+        assert!(ensure_child_path(&root, &target, "账号目录").is_err());
+    }
 }

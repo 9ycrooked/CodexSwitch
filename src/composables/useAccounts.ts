@@ -105,6 +105,21 @@ export function useAccounts(deps: {
     });
   }
 
+  async function deleteStoredAccount(account: AccountSummary, deleteProfile: boolean) {
+    let deleted = false;
+    await runOperation(`delete:${account.id}`, async () => {
+      try {
+        await api.deleteAccount(account.id, deleteProfile);
+        await deps.refreshAll();
+        deps.setMessage("success", `已删除 ${account.display_name}`);
+        deleted = true;
+      } catch (err) {
+        deps.setMessage("error", String(err));
+      }
+    });
+    return deleted;
+  }
+
   async function switchAccount(account: AccountSummary) {
     const label = account.email || account.display_name || account.account_id || account.id;
     const ok = window.confirm(
@@ -132,6 +147,7 @@ export function useAccounts(deps: {
     startOAuthLogin,
     closeOAuthLogin,
     refreshTokens,
+    deleteStoredAccount,
     switchAccount
   };
 }

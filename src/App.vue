@@ -21,6 +21,7 @@ import {
 } from "./api/codexSwitchApi";
 import AppSidebar from "./components/AppSidebar.vue";
 import AppTitlebar from "./components/AppTitlebar.vue";
+import DeleteAccountDialog from "./components/DeleteAccountDialog.vue";
 import ToastViewport from "./components/ToastViewport.vue";
 import UpdateDialog from "./components/UpdateDialog.vue";
 import { useAccounts } from "./composables/useAccounts";
@@ -49,6 +50,8 @@ const networkCheckResult = ref<NetworkExitCheckResult | null>(null);
 const networkCheckRunning = ref(false);
 const autoFlowServerStatus = ref<AutoFlowOAuthServerStatus | null>(null);
 const autoFlowServerBusy = ref(false);
+const deleteAccountTarget = ref<AccountSummary | null>(null);
+const deleteAccountProfile = ref(false);
 
 const settings = reactive<Settings>({
   codex_home: "C:\\Users\\Y\\.codex",
@@ -153,7 +156,7 @@ const {
   dismissUpdateDialog
 } = useUpdater(settings, setMessage);
 
-const { chooseAndImport, startOAuthLogin, closeOAuthLogin, refreshTokens, switchAccount } = useAccounts({
+const { chooseAndImport, startOAuthLogin, closeOAuthLogin, refreshTokens, deleteStoredAccount, switchAccount } = useAccounts({
   accounts,
   current,
   settings,
@@ -194,6 +197,27 @@ function selectTab(tab: Tab) {
     return;
   }
   selectedTab.value = tab;
+}
+
+function requestDeleteAccount(account: AccountSummary) {
+  deleteAccountTarget.value = account;
+  deleteAccountProfile.value = false;
+}
+
+function cancelDeleteAccount() {
+  if (deleteAccountTarget.value && isOperationActive(`delete:${deleteAccountTarget.value.id}`)) return;
+  deleteAccountTarget.value = null;
+  deleteAccountProfile.value = false;
+}
+
+async function confirmDeleteAccount() {
+  const account = deleteAccountTarget.value;
+  if (!account) return;
+  const deleted = await deleteStoredAccount(account, deleteAccountProfile.value);
+  if (deleted) {
+    deleteAccountTarget.value = null;
+    deleteAccountProfile.value = false;
+  }
 }
 
 async function saveSettings() {
@@ -426,6 +450,7 @@ onMounted(async () => {
         @switch-account="switchAccount"
         @refresh-tokens="refreshTokens"
         @select-quota-account="selectQuotaAccount"
+        @delete-account="requestDeleteAccount"
       />
 
       <QuotaView
@@ -511,6 +536,15 @@ onMounted(async () => {
       @dismiss="dismissUpdateDialog"
       @install="installPendingUpdate"
       @close-app="closeWindow"
+    />
+
+    <DeleteAccountDialog
+      v-model:delete-profile="deleteAccountProfile"
+      :open="Boolean(deleteAccountTarget)"
+      :account="deleteAccountTarget"
+      :deleting="Boolean(deleteAccountTarget && isOperationActive(`delete:${deleteAccountTarget.id}`))"
+      @cancel="cancelDeleteAccount"
+      @confirm="confirmDeleteAccount"
     />
   </main>
 </template>

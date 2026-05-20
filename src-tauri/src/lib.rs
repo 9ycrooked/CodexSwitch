@@ -22,6 +22,7 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             commands::import_accounts,
+            commands::delete_account,
             accounts::list_accounts,
             backups::list_backups,
             commands::switch_account,

@@ -170,6 +170,88 @@
   margin-top: 16px;
 }
 
+.delete-account-modal {
+  width: min(520px, calc(100vw - 32px));
+}
+
+.delete-account-summary,
+.delete-account-copy,
+.delete-profile-option {
+  margin-top: 14px;
+}
+
+.delete-account-summary {
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 11px 12px;
+  background: var(--bg-tertiary);
+}
+
+.delete-account-summary strong,
+.delete-account-summary span {
+  overflow-wrap: anywhere;
+}
+
+.delete-account-summary span {
+  color: var(--text-tertiary);
+  font-size: 12px;
+}
+
+.delete-account-copy {
+  display: grid;
+  gap: 8px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.delete-account-copy p {
+  margin: 0;
+}
+
+.delete-profile-option {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+  border: 1px solid var(--warning-border);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  color: var(--warning-text);
+  background: var(--warning-bg);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.delete-profile-option input {
+  width: 18px;
+  min-height: 18px;
+  accent-color: var(--danger-color);
+}
+
+.delete-profile-option small {
+  display: block;
+  margin-top: 4px;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+.danger-action,
+.danger-button:hover:not(:disabled) {
+  border-color: var(--failure-badge-border);
+  color: var(--failure-badge-text);
+  background: var(--failure-badge-bg);
+}
+
+.danger-action:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--danger-color) 80%, var(--border-color));
+  background: color-mix(in srgb, var(--danger-color) 22%, var(--bg-tertiary));
+}
+
 .warning {
   border: 1px solid var(--warning-border);
   border-radius: var(--radius-md);
