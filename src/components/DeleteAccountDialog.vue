@@ -50,8 +50,8 @@ function checkedValue(event: Event) {
           @change="$emit('update:deleteProfile', checkedValue($event))"
         />
         <span>
-          同时删除该账号的浏览器 Profile
-          <small>{{ account.browser_profile_dir ? "会清除该账号登录窗口的 cookie/cache/localStorage" : "该账号没有记录 Profile 目录" }}</small>
+          同时删除该账号的登录缓存
+          <small>{{ account.browser_profile_dir ? "包括登录窗口保存的 cookie、缓存和本地存储（浏览器 Profile）" : "该账号没有记录登录缓存目录" }}</small>
         </span>
       </label>
 
