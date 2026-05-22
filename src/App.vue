@@ -52,11 +52,12 @@ const autoFlowServerStatus = ref<AutoFlowOAuthServerStatus | null>(null);
 const autoFlowServerBusy = ref(false);
 const deleteAccountTarget = ref<AccountSummary | null>(null);
 const deleteAccountProfile = ref(false);
+const exportDialogOpen = ref(false);
+const selectedExportAccountIds = ref<string[]>([]);
 
 const settings = reactive<Settings>({
   codex_home: "C:\\Users\\Y\\.codex",
   process_names: ["Codex.exe", "codex.exe"],
-  close_timeout_ms: 6000,
   browser_profile_dir: "",
   oauth_callback_port: 1455,
   keep_login_profiles: true,
@@ -85,6 +86,9 @@ const filteredAccounts = computed(() => {
 const hasActiveOperation = computed(() => Boolean(activeOperation.value));
 const showTopbarRefresh = computed(() => selectedTab.value === "accounts" || selectedTab.value === "backups");
 const topbarRefreshLabel = computed(() => (selectedTab.value === "backups" ? "刷新备份" : "刷新账号"));
+const allExportAccountsSelected = computed(
+  () => Boolean(accounts.value.length) && selectedExportAccountIds.value.length === accounts.value.length
+);
 const settingsDirty = computed(() => {
   return savedSettingsSnapshot.value !== "" && savedSettingsSnapshot.value !== settingsSnapshot(settings);
 });
@@ -93,7 +97,6 @@ function settingsSnapshot(value: Settings) {
   return JSON.stringify({
     codex_home: value.codex_home,
     process_names: value.process_names,
-    close_timeout_ms: value.close_timeout_ms,
     browser_profile_dir: value.browser_profile_dir,
     oauth_callback_port: value.oauth_callback_port,
     keep_login_profiles: value.keep_login_profiles,
@@ -134,6 +137,10 @@ function isOperationActive(key: string) {
 
 function updateProcessNames(event: Event) {
   settings.process_names = (event.target as HTMLInputElement).value.split(",");
+}
+
+function eventChecked(event: Event) {
+  return (event.target as HTMLInputElement).checked;
 }
 
 function setMessage(type: ToastType, message: string) {
@@ -203,7 +210,16 @@ const {
   dismissUpdateDialog
 } = useUpdater(settings, setMessage);
 
-const { chooseAndImport, startOAuthLogin, closeOAuthLogin, refreshTokens, deleteStoredAccount, switchAccount } = useAccounts({
+const {
+  chooseAndImport,
+  exportSelectedAccounts,
+  startOAuthLogin,
+  closeOAuthLogin,
+  refreshTokens,
+  reloginAccount,
+  deleteStoredAccount,
+  switchAccount
+} = useAccounts({
   accounts,
   current,
   settings,
@@ -257,6 +273,37 @@ function cancelDeleteAccount() {
   deleteAccountProfile.value = false;
 }
 
+function openExportDialog() {
+  selectedExportAccountIds.value = accounts.value.map((account) => account.id);
+  exportDialogOpen.value = true;
+}
+
+function cancelExportDialog() {
+  if (isOperationActive("accounts:export")) return;
+  exportDialogOpen.value = false;
+}
+
+function toggleExportAccount(accountId: string, checked: boolean) {
+  const selected = new Set(selectedExportAccountIds.value);
+  if (checked) {
+    selected.add(accountId);
+  } else {
+    selected.delete(accountId);
+  }
+  selectedExportAccountIds.value = Array.from(selected);
+}
+
+function toggleAllExportAccounts(checked: boolean) {
+  selectedExportAccountIds.value = checked ? accounts.value.map((account) => account.id) : [];
+}
+
+async function confirmExportAccounts() {
+  const exported = await exportSelectedAccounts(selectedExportAccountIds.value);
+  if (exported) {
+    exportDialogOpen.value = false;
+  }
+}
+
 async function confirmDeleteAccount() {
   const account = deleteAccountTarget.value;
   if (!account) return;
@@ -278,7 +325,6 @@ async function saveSettings() {
     const saved = await api.updateSettings({
       codex_home: settings.codex_home,
       process_names: processNames,
-      close_timeout_ms: Number(settings.close_timeout_ms),
       browser_profile_dir: settings.browser_profile_dir,
       oauth_callback_port: Number(settings.oauth_callback_port),
       keep_login_profiles: Boolean(settings.keep_login_profiles),
@@ -472,6 +518,19 @@ onMounted(async () => {
           </button>
           <button
             v-if="selectedTab === 'accounts'"
+            class="secondary"
+            :disabled="busy || !accounts.length || isOperationActive('accounts:export')"
+            @click="openExportDialog"
+          >
+            <svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 21V9" />
+              <path d="m7 14 5-5 5 5" />
+              <path d="M5 3h14" />
+            </svg>
+            <span>导出账号</span>
+          </button>
+          <button
+            v-if="selectedTab === 'accounts'"
             :disabled="busy || isOperationActive('oauth:start')"
             @click="startOAuthLogin"
           >
@@ -508,6 +567,7 @@ onMounted(async () => {
         :has-active-operation="hasActiveOperation"
         @refresh-tokens="refreshTokens"
         @select-quota-account="selectQuotaAccount"
+        @relogin-account="reloginAccount"
         @delete-account="requestDeleteAccount"
       />
 
@@ -606,5 +666,69 @@ onMounted(async () => {
       @cancel="cancelDeleteAccount"
       @confirm="confirmDeleteAccount"
     />
+
+    <div v-if="exportDialogOpen" class="modal-backdrop">
+      <section class="modal export-account-modal" role="dialog" aria-modal="true" aria-labelledby="export-account-title">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">账号包</p>
+            <h2 id="export-account-title">导出账号和登录环境</h2>
+          </div>
+          <button
+            class="modal-close"
+            type="button"
+            aria-label="关闭导出账号"
+            :disabled="isOperationActive('accounts:export')"
+            @click="cancelExportDialog"
+          >
+            ×
+          </button>
+        </div>
+
+        <div class="export-account-copy">
+          <p>导出的 ZIP 会包含所选账号的 auth.json，以及该账号绑定的浏览器 Profile（cookie、缓存和本地存储）。</p>
+          <p>这个文件等同于登录凭据，请只在自己的设备之间迁移。</p>
+        </div>
+
+        <label class="checkbox-row export-select-all">
+          <input
+            type="checkbox"
+            :checked="allExportAccountsSelected"
+            :disabled="isOperationActive('accounts:export')"
+            @change="toggleAllExportAccounts(eventChecked($event))"
+          />
+          <span>全选账号</span>
+        </label>
+
+        <div class="export-account-list">
+          <label v-for="account in accounts" :key="account.id" class="export-account-row">
+            <input
+              type="checkbox"
+              :checked="selectedExportAccountIds.includes(account.id)"
+              :disabled="isOperationActive('accounts:export')"
+              @change="toggleExportAccount(account.id, eventChecked($event))"
+            />
+            <span>
+              <strong>{{ account.display_name }}</strong>
+              <small>{{ account.email || account.account_id || account.id }}</small>
+            </span>
+            <em>{{ account.browser_profile_dir ? "含登录环境" : "仅凭据" }}</em>
+          </label>
+        </div>
+
+        <div class="modal-actions">
+          <button class="secondary" type="button" :disabled="isOperationActive('accounts:export')" @click="cancelExportDialog">
+            取消
+          </button>
+          <button
+            type="button"
+            :disabled="isOperationActive('accounts:export') || !selectedExportAccountIds.length"
+            @click="confirmExportAccounts"
+          >
+            {{ isOperationActive("accounts:export") ? "正在导出" : `导出 ${selectedExportAccountIds.length} 个账号` }}
+          </button>
+        </div>
+      </section>
+    </div>
   </main>
 </template>

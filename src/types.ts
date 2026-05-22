@@ -87,7 +87,6 @@ export type AppPaths = {
 export type Settings = {
   codex_home: string;
   process_names: string[];
-  close_timeout_ms: number;
   browser_profile_dir: string;
   oauth_callback_port: number;
   keep_login_profiles: boolean;
@@ -121,6 +120,25 @@ export type SwitchResult = {
   account: AccountSummary;
   backup_id: string;
   warnings: string[];
+  codex_reopened: boolean;
+  codex_reopen_path?: string | null;
+};
+
+export type AccountBundleExportResult = {
+  path: string;
+  exported_count: number;
+  included_profile_count: number;
+};
+
+export type AccountBundleImportFailure = {
+  id?: string | null;
+  path?: string | null;
+  message: string;
+};
+
+export type AccountBundleImportResult = {
+  imported: AccountSummary[];
+  failed: AccountBundleImportFailure[];
 };
 
 export type UpdatePolicy = {

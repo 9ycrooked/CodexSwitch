@@ -80,7 +80,7 @@ function maskedKey(value: string) {
       <header class="settings-section-header">
         <span class="eyebrow">Basic</span>
         <h3>基础配置</h3>
-        <p>管理 Codex 配置目录、进程关闭名单和账号切换等待时间。</p>
+        <p>管理 Codex 配置目录与进程关闭名单。</p>
       </header>
       <div class="settings-section-grid">
         <section class="settings-info-grid settings-section-card full">
@@ -111,10 +111,6 @@ function maskedKey(value: string) {
           <span>需要关闭的 Codex 进程</span>
           <input :value="settings.process_names.join(', ')" @input="$emit('updateProcessNames', $event)" />
           <small>多个进程名用英文逗号分隔。</small>
-        </label>
-        <label class="form-group">
-          <span>关闭等待时间（毫秒）</span>
-          <input v-model.number="settings.close_timeout_ms" type="number" min="1000" step="500" />
         </label>
       </div>
     </section>

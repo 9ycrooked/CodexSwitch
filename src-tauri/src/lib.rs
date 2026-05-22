@@ -1,3 +1,4 @@
+mod account_bundle;
 mod accounts;
 mod autoflow_oauth_server;
 mod backups;
@@ -22,11 +23,14 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             commands::import_accounts,
+            commands::import_account_bundle,
+            commands::export_account_bundle,
             commands::delete_account,
             accounts::list_accounts,
             backups::list_backups,
             commands::switch_account,
             oauth::start_oauth_login,
+            oauth::start_account_relogin,
             oauth::close_oauth_login,
             oauth::complete_oauth_login,
             oauth::refresh_account_tokens,

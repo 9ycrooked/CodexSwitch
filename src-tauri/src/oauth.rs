@@ -42,18 +42,42 @@ struct OAuthPending {
 
 #[tauri::command]
 pub fn start_oauth_login(app: AppHandle, profile_id: Option<String>) -> AppResult<OAuthLoginStart> {
-    cancel_pending_oauth_login(&app);
     let settings = load_settings()?;
-    let (port, listener) = bind_oauth_listener(settings.oauth_callback_port)?;
-    let redirect_uri = format!("http://localhost:{port}/auth/callback");
-    let state = Uuid::new_v4().simple().to_string();
-    let (code_verifier, code_challenge) = generate_pkce_codes();
     let profile_id = sanitize_id(
         &profile_id
             .filter(|value| !value.trim().is_empty())
             .unwrap_or_else(|| format!("login-{}", Uuid::new_v4().simple())),
     );
     let profile_dir = PathBuf::from(&settings.browser_profile_dir).join(&profile_id);
+    start_oauth_login_with_profile_dir(app, profile_id, profile_dir, settings, true)
+}
+
+#[tauri::command]
+pub fn start_account_relogin(app: AppHandle, account_id: String) -> AppResult<OAuthLoginStart> {
+    let account = load_account(&account_id)?;
+    let settings = load_settings()?;
+    let profile_id = sanitize_id(&account_id);
+    let profile_dir = account
+        .summary
+        .browser_profile_dir
+        .as_deref()
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from(&settings.browser_profile_dir).join(&profile_id));
+    start_oauth_login_with_profile_dir(app, profile_id, profile_dir, settings, false)
+}
+
+fn start_oauth_login_with_profile_dir(
+    app: AppHandle,
+    profile_id: String,
+    profile_dir: PathBuf,
+    settings: settings::Settings,
+    force_login_prompt: bool,
+) -> AppResult<OAuthLoginStart> {
+    cancel_pending_oauth_login(&app);
+    let (port, listener) = bind_oauth_listener(settings.oauth_callback_port)?;
+    let redirect_uri = format!("http://localhost:{port}/auth/callback");
+    let state = Uuid::new_v4().simple().to_string();
+    let (code_verifier, code_challenge) = generate_pkce_codes();
     fs::create_dir_all(&profile_dir).map_err(stringify_io)?;
     let window_label = format!("oauth-login-{profile_id}");
     let mode = settings::sanitize_oauth_login_mode(&settings.oauth_login_mode);
@@ -74,7 +98,8 @@ pub fn start_oauth_login(app: AppHandle, profile_id: Option<String>) -> AppResul
     };
     *oauth_pending().lock().map_err(|err| err.to_string())? = Some(pending);
 
-    let auth_url = build_oauth_url(&redirect_uri, &state, &code_challenge);
+    let auth_url =
+        build_oauth_url_with_prompt(&redirect_uri, &state, &code_challenge, force_login_prompt);
     if mode == "embedded" {
         open_oauth_webview(&app, &window_label, &auth_url, &profile_dir).map_err(|err| {
             let _ = oauth_pending().lock().map(|mut pending| pending.take());
@@ -300,7 +325,10 @@ fn sync_auth_json_account_id(auth_json: &mut Value, summary: &AccountSummary) {
         .and_then(Value::as_str)
         .is_none_or(|value| value.trim().is_empty());
     if should_update {
-        tokens.insert("account_id".to_string(), Value::String(account_id.to_string()));
+        tokens.insert(
+            "account_id".to_string(),
+            Value::String(account_id.to_string()),
+        );
     }
 }
 
@@ -330,7 +358,16 @@ pub(crate) fn generate_pkce_codes() -> (String, String) {
 }
 
 pub(crate) fn build_oauth_url(redirect_uri: &str, state: &str, code_challenge: &str) -> String {
-    let params = [
+    build_oauth_url_with_prompt(redirect_uri, state, code_challenge, true)
+}
+
+fn build_oauth_url_with_prompt(
+    redirect_uri: &str,
+    state: &str,
+    code_challenge: &str,
+    force_login_prompt: bool,
+) -> String {
+    let mut params = vec![
         ("client_id", OAUTH_CLIENT_ID),
         ("response_type", "code"),
         ("redirect_uri", redirect_uri),
@@ -338,10 +375,12 @@ pub(crate) fn build_oauth_url(redirect_uri: &str, state: &str, code_challenge: &
         ("state", state),
         ("code_challenge", code_challenge),
         ("code_challenge_method", "S256"),
-        ("prompt", "login"),
         ("id_token_add_organizations", "true"),
         ("codex_cli_simplified_flow", "true"),
     ];
+    if force_login_prompt {
+        params.push(("prompt", "login"));
+    }
     let encoded = params
         .iter()
         .map(|(key, value)| format!("{key}={}", urlencoding::encode(value)))
@@ -589,7 +628,9 @@ mod tests {
         sync_auth_json_account_id(&mut auth_json, &summary);
 
         assert_eq!(
-            auth_json.pointer("/tokens/account_id").and_then(Value::as_str),
+            auth_json
+                .pointer("/tokens/account_id")
+                .and_then(Value::as_str),
             Some("acct-autoflow")
         );
     }

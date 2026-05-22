@@ -6,7 +6,8 @@ Codex Switch 是一个 Windows 桌面端 Codex 账号切换工具，用于在本
 
 ## 功能
 
-- 导入单个或多个 Codex OAuth 凭据文件。
+- 导出所选账号为 Codex Switch ZIP 账号包。
+- 从 Codex Switch ZIP 账号包批量导入账号凭据和绑定的登录环境。
 - 在本地账号库中保存多个 Codex 账号。
 - 切换账号时替换 `auth.json`，并按“当前配置优先”合并 `config.toml`。
 - 尽量保留当前本机已有的 Codex 工具、插件、MCP servers、projects 等配置。
@@ -14,6 +15,7 @@ Codex Switch 是一个 Windows 桌面端 Codex 账号切换工具，用于在本
 - 支持从备份中恢复 `auth.json` 和 `config.toml`。
 - 支持通过 OAuth 登录保存新账号。
 - 每个 OAuth 登录账号使用独立 WebView2/Profile 目录，隔离 cookie、cache、localStorage。
+- 支持用账号保存的登录环境重新 OAuth 登录，用于账号凭据失效后的续登。
 - 支持手动刷新 token。
 - 支持手动检查 Codex 额度/状态，额度接口为 best effort。
 - 支持启动时检查更新，并通过 GitHub Release / Tauri updater 发布安装包。
@@ -61,6 +63,22 @@ C:\Users\Y\.codex
 
 因此替换该目录下的 `auth.json` 可能会同时影响同一 Windows 用户下 Codex 桌面端和 Codex CLI 的登录状态。
 
+## 账号包导入导出
+
+Codex Switch 使用 `.zip` 账号包作为导入导出格式。旧的 `.json` / `.toml` 批量导入格式不再支持。
+
+账号包结构：
+
+```text
+manifest.json
+accounts\<account-id>\auth.json
+profiles\<account-id>\...      可选，账号绑定的登录环境
+```
+
+导出会包含所选账号的 `auth.json`，以及该账号记录的隔离浏览器 Profile 目录。Profile 内可能包含 cookie、cache、localStorage 等登录环境数据。导入后账号仍保存到现有账号库结构，`config.toml`、额度记录、usage 记录和备份不会随账号包迁移。
+
+导入时会校验 ZIP 格式、`manifest.json` 的格式版本、包内路径安全性，以及每个 `auth.json` 的 SHA-256。单个账号损坏时会跳过该账号并报告失败原因。
+
 ## 安全提醒
 
 Codex Switch 会在本地保存导入或登录得到的 OAuth 凭据，这些文件可能包含 `refresh_token`。
@@ -70,7 +88,7 @@ Codex Switch 会在本地保存导入或登录得到的 OAuth 凭据，这些文
 - 软件数据目录
 - `accounts` 账号库
 - `backups` 备份目录
-- 导出的 OAuth JSON 文件
+- 导出的 Codex Switch ZIP 账号包
 - 当前 Codex home 下的 `auth.json`
 
 如果这些文件泄露，可能导致你的账号登录凭据被他人使用。

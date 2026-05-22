@@ -2,55 +2,16 @@ use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use chrono::{DateTime, Utc};
 use serde_json::{json, Map, Value};
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use uuid::Uuid;
 
-use crate::config_merge::parse_toml;
 use crate::error::{stringify_io, AppResult};
-use crate::io::{atomic_write_json, atomic_write_text, read_json};
+use crate::io::{atomic_write_json, read_json};
 use crate::models::{AccountSummary, OAuthMetadata, StoredAccount, TokenResponse};
 use crate::paths::{account_dir, app_store_dir};
 
-pub(crate) fn import_account_json(
-    path: &Path,
-    config_path: Option<&Path>,
-    _accounts_dir: &Path,
-) -> AppResult<AccountSummary> {
-    let raw_text = fs::read_to_string(path).map_err(stringify_io)?;
-    let raw_json: Value = serde_json::from_str(&raw_text)
-        .map_err(|err| format!("JSON 解析失败 {}：{err}", path.display()))?;
-    let (auth_json, mut summary) = normalize_auth_json(&raw_json)?;
-    summary.imported_at = now_string();
-    summary.has_config = config_path.is_some();
-
-    let id_source = summary
-        .account_id
-        .clone()
-        .or_else(|| summary.email.clone())
-        .unwrap_or_else(|| Uuid::new_v4().to_string());
-    summary.id = sanitize_id(&id_source);
-    if summary.display_name.trim().is_empty() {
-        summary.display_name = summary
-            .email
-            .clone()
-            .or_else(|| summary.account_id.clone())
-            .unwrap_or_else(|| "Codex account".to_string());
-    }
-    summary.oauth_metadata = oauth_metadata_from_auth_json(&auth_json);
-
-    save_account_record(&summary, &auth_json, &raw_json)?;
-
-    if let Some(config_path) = config_path {
-        let text = fs::read_to_string(config_path).map_err(stringify_io)?;
-        parse_toml(&text)?;
-        atomic_write_text(&account_dir(&summary.id)?.join("config.toml"), &text)?;
-    }
-
-    Ok(summary)
-}
-
-fn normalize_auth_json(raw: &Value) -> AppResult<(Value, AccountSummary)> {
+pub(crate) fn normalize_auth_json(raw: &Value) -> AppResult<(Value, AccountSummary)> {
     if raw.get("auth_mode").is_some() && raw.get("tokens").is_some() {
         let tokens = raw
             .get("tokens")
@@ -281,7 +242,17 @@ pub(crate) fn save_account_record(
     auth_json: &Value,
     original_json: &Value,
 ) -> AppResult<()> {
-    let dir = account_dir(&summary.id)?;
+    let accounts_dir = app_store_dir()?.join("accounts");
+    save_account_record_to_dir(&accounts_dir, summary, auth_json, original_json)
+}
+
+pub(crate) fn save_account_record_to_dir(
+    accounts_dir: &Path,
+    summary: &AccountSummary,
+    auth_json: &Value,
+    original_json: &Value,
+) -> AppResult<()> {
+    let dir = accounts_dir.join(sanitize_id(&summary.id));
     fs::create_dir_all(&dir).map_err(stringify_io)?;
     atomic_write_json(&dir.join("metadata.json"), summary)?;
     atomic_write_json(&dir.join("auth.json"), auth_json)?;
@@ -474,27 +445,6 @@ pub(crate) fn sanitize_id(value: &str) -> String {
     } else {
         out
     }
-}
-
-pub(crate) fn matching_config_path(json_path: &Path, toml_paths: &[PathBuf]) -> Option<PathBuf> {
-    if toml_paths.is_empty() {
-        return None;
-    }
-    if toml_paths.len() == 1 {
-        return Some(toml_paths[0].clone());
-    }
-    let json_stem = json_path
-        .file_stem()?
-        .to_string_lossy()
-        .to_ascii_lowercase();
-    toml_paths
-        .iter()
-        .find(|path| {
-            path.file_stem()
-                .map(|stem| stem.to_string_lossy().to_ascii_lowercase() == json_stem)
-                .unwrap_or(false)
-        })
-        .cloned()
 }
 
 #[cfg(test)]

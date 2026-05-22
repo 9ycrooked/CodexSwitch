@@ -1,5 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import type {
+  AccountBundleExportResult,
+  AccountBundleImportResult,
   AccountSummary,
   AppPaths,
   AutoFlowOAuthServerStatus,
@@ -76,12 +78,24 @@ export function importAccounts(paths: string[]) {
   return invoke<AccountSummary[]>("import_accounts", { paths });
 }
 
+export function importAccountBundle(path: string) {
+  return invoke<AccountBundleImportResult>("import_account_bundle", { path });
+}
+
+export function exportAccountBundle(accountIds: string[], outputPath: string) {
+  return invoke<AccountBundleExportResult>("export_account_bundle", { accountIds, outputPath });
+}
+
 export function deleteAccount(accountId: string, deleteProfile: boolean) {
   return invoke("delete_account", { accountId, deleteProfile });
 }
 
 export function startOauthLogin(profileId: string | null = null) {
   return invoke<{ auth_url: string; browser_profile_dir: string; mode: string }>("start_oauth_login", { profileId });
+}
+
+export function startAccountRelogin(accountId: string) {
+  return invoke<{ auth_url: string; browser_profile_dir: string; mode: string }>("start_account_relogin", { accountId });
 }
 
 export function checkOauthNetworkExit(includeEgressRegion?: boolean) {

@@ -24,6 +24,7 @@ defineEmits<{
   "update:query": [string];
   refreshTokens: [AccountSummary];
   selectQuotaAccount: [AccountSummary];
+  reloginAccount: [AccountSummary];
   deleteAccount: [AccountSummary];
 }>();
 
@@ -39,9 +40,14 @@ function inputValue(event: Event) {
       <span>{{ filteredAccounts.length }} / {{ accounts.length }} 个账号</span>
     </div>
 
+    <div class="bundle-drop-hint">
+      <strong>导入账号包</strong>
+      <span>可直接把 Codex Switch 导出的 .zip 压缩包拖到窗口中，导入账号凭证和绑定的登录环境。</span>
+    </div>
+
     <div v-if="!filteredAccounts.length" class="empty">
       <strong>还没有账号</strong>
-      <p>导入 Codex OAuth JSON 或已有 auth.json，就能在这里一键切换。</p>
+      <p>导入 Codex Switch 账号压缩包，或用 OAuth 登录添加新账号。</p>
     </div>
 
     <div v-else class="account-grid">
@@ -109,6 +115,9 @@ function inputValue(event: Event) {
               </button>
               <button :disabled="busy || isOperationActive('refresh-token:' + account.id)" @click="$emit('refreshTokens', account)">
                 刷新认证
+              </button>
+              <button :disabled="busy || isOperationActive('relogin:' + account.id)" @click="$emit('reloginAccount', account)">
+                重新登录
               </button>
               <button
                 class="secondary danger-button"

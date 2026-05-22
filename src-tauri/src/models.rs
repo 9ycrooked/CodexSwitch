@@ -62,6 +62,28 @@ pub struct SwitchResult {
     pub account: AccountSummary,
     pub backup_id: String,
     pub warnings: Vec<String>,
+    pub codex_reopened: bool,
+    pub codex_reopen_path: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AccountBundleExportResult {
+    pub path: String,
+    pub exported_count: usize,
+    pub included_profile_count: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AccountBundleImportFailure {
+    pub id: Option<String>,
+    pub path: Option<String>,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AccountBundleImportResult {
+    pub imported: Vec<AccountSummary>,
+    pub failed: Vec<AccountBundleImportFailure>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -181,4 +203,44 @@ pub(crate) struct BackupMeta {
     pub created_at: String,
     pub auth_path: Option<String>,
     pub config_path: Option<String>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn switch_result_serializes_codex_reopen_status() {
+        let result = SwitchResult {
+            account: AccountSummary {
+                id: "acct-1".to_string(),
+                display_name: "User".to_string(),
+                email: None,
+                account_id: None,
+                plan: None,
+                expired: None,
+                disabled: false,
+                imported_at: "2026-05-22T00:00:00Z".to_string(),
+                has_config: false,
+                browser_profile_dir: None,
+                oauth_metadata: None,
+                quota_state: None,
+                usage_state: None,
+            },
+            backup_id: "backup-1".to_string(),
+            warnings: Vec::new(),
+            codex_reopened: true,
+            codex_reopen_path: Some(
+                r"C:\Program Files\WindowsApps\OpenAI.Codex\app\Codex.exe".to_string(),
+            ),
+        };
+
+        let value = serde_json::to_value(result).expect("switch result should serialize");
+
+        assert_eq!(value["codex_reopened"], true);
+        assert_eq!(
+            value["codex_reopen_path"],
+            r"C:\Program Files\WindowsApps\OpenAI.Codex\app\Codex.exe"
+        );
+    }
 }

@@ -11,8 +11,6 @@ pub struct Settings {
     pub codex_home: String,
     #[serde(default = "default_process_names")]
     pub process_names: Vec<String>,
-    #[serde(default = "default_close_timeout_ms")]
-    pub close_timeout_ms: u64,
     #[serde(default = "default_browser_profile_dir")]
     pub browser_profile_dir: String,
     #[serde(default = "default_oauth_callback_port")]
@@ -55,7 +53,6 @@ pub fn default_settings() -> Settings {
     Settings {
         codex_home: default_codex_home(),
         process_names: default_process_names(),
-        close_timeout_ms: default_close_timeout_ms(),
         browser_profile_dir: default_browser_profile_dir(),
         oauth_callback_port: default_oauth_callback_port(),
         keep_login_profiles: default_keep_login_profiles(),
@@ -86,9 +83,6 @@ pub(crate) fn sanitize_settings(settings: Settings) -> AppResult<Settings> {
     if settings.codex_home.trim().is_empty() {
         return Err("Codex home 不能为空。".into());
     }
-    if settings.close_timeout_ms < 500 {
-        return Err("关闭超时不能小于 500ms。".into());
-    }
     if settings.oauth_callback_port < 1024 {
         return Err("OAuth 回调端口不能小于 1024。".into());
     }
@@ -109,7 +103,6 @@ pub(crate) fn sanitize_settings(settings: Settings) -> AppResult<Settings> {
     Ok(Settings {
         codex_home: settings.codex_home.trim().to_string(),
         process_names,
-        close_timeout_ms: settings.close_timeout_ms,
         browser_profile_dir: settings.browser_profile_dir.trim().to_string(),
         oauth_callback_port: settings.oauth_callback_port,
         keep_login_profiles: settings.keep_login_profiles,
@@ -150,10 +143,6 @@ fn default_codex_home() -> String {
 
 fn default_process_names() -> Vec<String> {
     vec!["Codex.exe".to_string(), "codex.exe".to_string()]
-}
-
-fn default_close_timeout_ms() -> u64 {
-    6000
 }
 
 fn default_browser_profile_dir() -> String {
@@ -202,6 +191,25 @@ mod tests {
         assert!(!settings.force_update_on_startup);
         assert!(settings.check_oauth_network_on_login);
         assert!(!settings.check_egress_region);
+    }
+
+    #[test]
+    fn settings_ignores_legacy_close_timeout_and_no_longer_serializes_it() {
+        let raw = r#"{
+            "codex_home": "C:\\Users\\Y\\.codex",
+            "process_names": ["Codex.exe"],
+            "close_timeout_ms": 3000,
+            "browser_profile_dir": "profiles",
+            "oauth_callback_port": 1455,
+            "keep_login_profiles": true,
+            "oauth_login_mode": "external"
+        }"#;
+
+        let settings: Settings =
+            serde_json::from_str(raw).expect("legacy settings should deserialize");
+        let serialized = serde_json::to_value(settings).expect("settings should serialize");
+
+        assert!(serialized.get("close_timeout_ms").is_none());
     }
 
     #[test]

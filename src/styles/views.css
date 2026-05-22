@@ -232,6 +232,31 @@
   gap: 14px;
 }
 
+.bundle-drop-hint {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+  border: 1px dashed color-mix(in srgb, var(--primary-color) 45%, var(--border-color));
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  color: var(--text-secondary);
+  background: color-mix(in srgb, var(--bg-secondary) 50%, transparent);
+}
+
+.bundle-drop-hint strong {
+  flex: 0 0 auto;
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.bundle-drop-hint span {
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .file-card {
   position: relative;
   overflow: hidden;

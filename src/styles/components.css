@@ -174,9 +174,16 @@
   width: min(520px, calc(100vw - 32px));
 }
 
+.export-account-modal {
+  width: min(640px, calc(100vw - 32px));
+}
+
 .delete-account-summary,
 .delete-account-copy,
-.delete-profile-option {
+.delete-profile-option,
+.export-account-copy,
+.export-select-all,
+.export-account-list {
   margin-top: 14px;
 }
 
@@ -209,6 +216,78 @@
 
 .delete-account-copy p {
   margin: 0;
+}
+
+.export-account-copy {
+  display: grid;
+  gap: 8px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.export-account-copy p {
+  margin: 0;
+}
+
+.export-select-all {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  background: var(--bg-tertiary);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.export-select-all input,
+.export-account-row input {
+  width: 18px;
+  min-height: 18px;
+  accent-color: var(--success-color);
+}
+
+.export-account-list {
+  display: grid;
+  gap: 8px;
+  max-height: 340px;
+  overflow: auto;
+}
+
+.export-account-row {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 72%, transparent);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  background: color-mix(in srgb, var(--bg-secondary) 46%, transparent);
+}
+
+.export-account-row strong,
+.export-account-row small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.export-account-row small {
+  margin-top: 3px;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.export-account-row em {
+  color: var(--text-tertiary);
+  font-size: 12px;
+  font-style: normal;
+  white-space: nowrap;
 }
 
 .delete-profile-option {
