@@ -17,8 +17,8 @@ use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
 use uuid::Uuid;
 
 use crate::accounts::{
-    auth_json_from_token_response, load_account, now_string, sanitize_id, save_account_record,
-    summary_from_auth_json,
+    auth_json_from_token_response, list_accounts, load_account, now_string, sanitize_id,
+    save_account_record, summary_from_auth_json,
 };
 use crate::error::{run_blocking, stringify_io, AppResult};
 use crate::models::{AccountSummary, OAuthLoginStart, TokenResponse};
@@ -37,6 +37,7 @@ struct OAuthPending {
     profile_id: String,
     browser_profile_dir: PathBuf,
     window_label: String,
+    replace_account: Option<AccountSummary>,
     cancel: Arc<AtomicBool>,
 }
 
@@ -49,7 +50,7 @@ pub fn start_oauth_login(app: AppHandle, profile_id: Option<String>) -> AppResul
             .unwrap_or_else(|| format!("login-{}", Uuid::new_v4().simple())),
     );
     let profile_dir = PathBuf::from(&settings.browser_profile_dir).join(&profile_id);
-    start_oauth_login_with_profile_dir(app, profile_id, profile_dir, settings, true)
+    start_oauth_login_with_profile_dir(app, profile_id, profile_dir, settings, true, None)
 }
 
 #[tauri::command]
@@ -63,7 +64,14 @@ pub fn start_account_relogin(app: AppHandle, account_id: String) -> AppResult<OA
         .as_deref()
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from(&settings.browser_profile_dir).join(&profile_id));
-    start_oauth_login_with_profile_dir(app, profile_id, profile_dir, settings, false)
+    start_oauth_login_with_profile_dir(
+        app,
+        profile_id,
+        profile_dir,
+        settings,
+        false,
+        Some(account.summary),
+    )
 }
 
 fn start_oauth_login_with_profile_dir(
@@ -72,6 +80,7 @@ fn start_oauth_login_with_profile_dir(
     profile_dir: PathBuf,
     settings: settings::Settings,
     force_login_prompt: bool,
+    replace_account: Option<AccountSummary>,
 ) -> AppResult<OAuthLoginStart> {
     cancel_pending_oauth_login(&app);
     let (port, listener) = bind_oauth_listener(settings.oauth_callback_port)?;
@@ -94,6 +103,7 @@ fn start_oauth_login_with_profile_dir(
         profile_id: profile_id.clone(),
         browser_profile_dir: profile_dir.clone(),
         window_label: window_label.clone(),
+        replace_account,
         cancel: cancel.clone(),
     };
     *oauth_pending().lock().map_err(|err| err.to_string())? = Some(pending);
@@ -262,10 +272,11 @@ fn complete_oauth_login_internal(callback_query: &str) -> AppResult<AccountSumma
     }
     let _window_label = pending.window_label.clone();
     let token = exchange_code_for_tokens(&code, &pending.redirect_uri, &pending.code_verifier)?;
-    save_token_response_as_account(
+    save_token_response_as_account_with_previous(
         &token,
         &pending.profile_id,
         Some(pending.browser_profile_dir.to_string_lossy().to_string()),
+        pending.replace_account,
     )
 }
 
@@ -276,15 +287,19 @@ pub(crate) fn account_summary_from_token_response(
     browser_profile_dir: Option<String>,
 ) -> AppResult<AccountSummary> {
     let auth_json = auth_json_from_token_response(token);
-    account_summary_from_auth_json(&auth_json, fallback_id, browser_profile_dir)
+    account_summary_from_auth_json(&auth_json, fallback_id, browser_profile_dir, None)
 }
 
 fn account_summary_from_auth_json(
     auth_json: &Value,
     fallback_id: &str,
     browser_profile_dir: Option<String>,
+    previous: Option<AccountSummary>,
 ) -> AppResult<AccountSummary> {
-    let mut summary = summary_from_auth_json(auth_json, None);
+    let preserve_existing_card = previous
+        .as_ref()
+        .is_some_and(|summary| !summary.id.trim().is_empty());
+    let mut summary = summary_from_auth_json(auth_json, previous);
     if summary
         .account_id
         .as_deref()
@@ -295,17 +310,80 @@ fn account_summary_from_auth_json(
             .as_ref()
             .and_then(|metadata| metadata.account_id.clone());
     }
-    summary.id = sanitize_id(
-        &summary
-            .account_id
-            .clone()
-            .or(summary.email.clone())
-            .unwrap_or_else(|| fallback_id.to_string()),
-    );
+    if preserve_existing_card {
+        summary.id = sanitize_id(&summary.id);
+    } else {
+        summary.id = sanitize_id(
+            &summary
+                .account_id
+                .clone()
+                .or(summary.email.clone())
+                .unwrap_or_else(|| fallback_id.to_string()),
+        );
+        summary.imported_at = now_string();
+        summary.has_config = false;
+    }
     summary.browser_profile_dir = browser_profile_dir;
-    summary.imported_at = now_string();
-    summary.has_config = false;
     Ok(summary)
+}
+
+fn find_existing_account_card(
+    candidate: &AccountSummary,
+    accounts: &[AccountSummary],
+) -> Option<AccountSummary> {
+    let candidate_account_id = normalized_identity(
+        candidate
+            .account_id
+            .as_deref()
+            .or_else(|| candidate.oauth_metadata.as_ref()?.account_id.as_deref()),
+    );
+    if let Some(candidate_account_id) = candidate_account_id {
+        if let Some(account) = accounts.iter().find(|account| {
+            normalized_identity(
+                account
+                    .account_id
+                    .as_deref()
+                    .or_else(|| account.oauth_metadata.as_ref()?.account_id.as_deref()),
+            )
+            .as_deref()
+                == Some(candidate_account_id.as_str())
+        }) {
+            return Some(account.clone());
+        }
+    }
+
+    let candidate_email = normalized_identity(
+        candidate
+            .email
+            .as_deref()
+            .or_else(|| candidate.oauth_metadata.as_ref()?.email.as_deref()),
+    );
+    if let Some(candidate_email) = candidate_email {
+        return accounts
+            .iter()
+            .find(|account| {
+                normalized_identity(
+                    account
+                        .email
+                        .as_deref()
+                        .or_else(|| account.oauth_metadata.as_ref()?.email.as_deref()),
+                )
+                .as_deref()
+                    == Some(candidate_email.as_str())
+            })
+            .cloned();
+    }
+
+    None
+}
+
+fn normalized_identity(value: Option<&str>) -> Option<String> {
+    let value = value?.trim();
+    if value.is_empty() {
+        None
+    } else {
+        Some(value.to_string())
+    }
 }
 
 fn sync_auth_json_account_id(auth_json: &mut Value, summary: &AccountSummary) {
@@ -337,8 +415,31 @@ pub(crate) fn save_token_response_as_account(
     fallback_id: &str,
     browser_profile_dir: Option<String>,
 ) -> AppResult<AccountSummary> {
+    save_token_response_as_account_with_previous(token, fallback_id, browser_profile_dir, None)
+}
+
+fn save_token_response_as_account_with_previous(
+    token: &TokenResponse,
+    fallback_id: &str,
+    browser_profile_dir: Option<String>,
+    previous: Option<AccountSummary>,
+) -> AppResult<AccountSummary> {
     let mut auth_json = auth_json_from_token_response(token);
-    let summary = account_summary_from_auth_json(&auth_json, fallback_id, browser_profile_dir)?;
+    let previous = match previous {
+        Some(previous) => Some(previous),
+        None => {
+            let candidate = account_summary_from_auth_json(
+                &auth_json,
+                fallback_id,
+                browser_profile_dir.clone(),
+                None,
+            )?;
+            let accounts = list_accounts().unwrap_or_default();
+            find_existing_account_card(&candidate, &accounts)
+        }
+    };
+    let summary =
+        account_summary_from_auth_json(&auth_json, fallback_id, browser_profile_dir, previous)?;
     sync_auth_json_account_id(&mut auth_json, &summary);
     let original = flat_oauth_json_from_auth_json(&auth_json, &summary);
     save_account_record(&summary, &auth_json, &original)?;
@@ -606,6 +707,132 @@ mod tests {
     }
 
     #[test]
+    fn relogin_summary_preserves_target_account_card_id() {
+        let claims = json!({
+            "email": "user@example.com",
+            "https://api.openai.com/auth": {
+                "chatgpt_account_id": "acct-real",
+                "chatgpt_plan_type": "plus"
+            }
+        });
+        let payload = URL_SAFE_NO_PAD.encode(serde_json::to_vec(&claims).unwrap());
+        let auth_json = auth_json_from_token_response(&TokenResponse {
+            access_token: "new-access".to_string(),
+            refresh_token: "new-refresh".to_string(),
+            id_token: format!("header.{payload}.sig"),
+            expires_in: 3600,
+        });
+        let previous = AccountSummary {
+            id: "login-failed-card".to_string(),
+            display_name: "Old login".to_string(),
+            email: None,
+            account_id: None,
+            plan: None,
+            expired: None,
+            disabled: false,
+            imported_at: "2026-05-01T00:00:00Z".to_string(),
+            has_config: true,
+            browser_profile_dir: Some("old-profile".to_string()),
+            oauth_metadata: None,
+            quota_state: None,
+            usage_state: None,
+        };
+
+        let summary = account_summary_from_auth_json(
+            &auth_json,
+            "fallback-profile",
+            Some("new-profile".to_string()),
+            Some(previous),
+        )
+        .expect("summary should be generated");
+
+        assert_eq!(summary.id, "login-failed-card");
+        assert_eq!(summary.email.as_deref(), Some("user@example.com"));
+        assert_eq!(summary.account_id.as_deref(), Some("acct-real"));
+        assert_eq!(summary.plan.as_deref(), Some("plus"));
+        assert_eq!(summary.imported_at, "2026-05-01T00:00:00Z");
+        assert!(summary.has_config);
+        assert_eq!(summary.browser_profile_dir.as_deref(), Some("new-profile"));
+    }
+
+    #[test]
+    fn does_not_merge_email_that_differs_only_by_case() {
+        let candidate = AccountSummary {
+            id: "acct-real".to_string(),
+            display_name: "user@example.com".to_string(),
+            email: Some("USER@example.com".to_string()),
+            account_id: None,
+            plan: Some("plus".to_string()),
+            expired: None,
+            disabled: false,
+            imported_at: "2026-05-23T00:00:00Z".to_string(),
+            has_config: false,
+            browser_profile_dir: None,
+            oauth_metadata: None,
+            quota_state: None,
+            usage_state: None,
+        };
+        let old_card = AccountSummary {
+            id: "old-card".to_string(),
+            display_name: "old".to_string(),
+            email: Some("user@example.com".to_string()),
+            account_id: None,
+            plan: None,
+            expired: None,
+            disabled: false,
+            imported_at: "2026-05-01T00:00:00Z".to_string(),
+            has_config: true,
+            browser_profile_dir: Some("old-profile".to_string()),
+            oauth_metadata: None,
+            quota_state: None,
+            usage_state: None,
+        };
+
+        let matched = find_existing_account_card(&candidate, &[old_card]);
+
+        assert!(matched.is_none());
+    }
+
+    #[test]
+    fn finds_existing_account_card_by_exact_stable_email() {
+        let candidate = AccountSummary {
+            id: "acct-real".to_string(),
+            display_name: "user@example.com".to_string(),
+            email: Some("user@example.com".to_string()),
+            account_id: None,
+            plan: Some("plus".to_string()),
+            expired: None,
+            disabled: false,
+            imported_at: "2026-05-23T00:00:00Z".to_string(),
+            has_config: false,
+            browser_profile_dir: None,
+            oauth_metadata: None,
+            quota_state: None,
+            usage_state: None,
+        };
+        let old_card = AccountSummary {
+            id: "old-card".to_string(),
+            display_name: "old".to_string(),
+            email: Some("user@example.com".to_string()),
+            account_id: None,
+            plan: None,
+            expired: None,
+            disabled: false,
+            imported_at: "2026-05-01T00:00:00Z".to_string(),
+            has_config: true,
+            browser_profile_dir: Some("old-profile".to_string()),
+            oauth_metadata: None,
+            quota_state: None,
+            usage_state: None,
+        };
+
+        let matched = find_existing_account_card(&candidate, &[old_card])
+            .expect("exact same email should reuse the old card");
+
+        assert_eq!(matched.id, "old-card");
+    }
+
+    #[test]
     fn fills_auth_json_account_id_from_summary_metadata() {
         let claims = json!({
             "email": "autoflow@example.com",
@@ -622,7 +849,7 @@ mod tests {
             expires_in: 3600,
         };
         let mut auth_json = auth_json_from_token_response(&token);
-        let summary = account_summary_from_auth_json(&auth_json, "fallback-profile", None)
+        let summary = account_summary_from_auth_json(&auth_json, "fallback-profile", None, None)
             .expect("summary should be generated");
 
         sync_auth_json_account_id(&mut auth_json, &summary);
