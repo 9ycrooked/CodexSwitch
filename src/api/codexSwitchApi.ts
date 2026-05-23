@@ -54,6 +54,18 @@ export function openBackupDir(backupId: string) {
   return invoke("open_backup_dir", { backupId });
 }
 
+export function openProjectRepository() {
+  return invoke("open_project_repository");
+}
+
+export function openProjectIssues() {
+  return invoke("open_project_issues");
+}
+
+export function openSupportEmail() {
+  return invoke("open_support_email");
+}
+
 export function updateSettings(settings: Settings) {
   return invoke<Settings>("update_settings", { settings });
 }

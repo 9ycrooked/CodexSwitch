@@ -3,7 +3,7 @@ import { ref } from "vue";
 import type { AppPaths, AutoFlowOAuthServerStatus, NetworkExitCheckResult, Settings } from "../types";
 import { formatDate } from "../utils/format";
 
-type SettingsSection = "basic" | "login" | "integrations" | "updates" | "security";
+type SettingsSection = "basic" | "login" | "integrations" | "updates" | "security" | "about";
 
 defineProps<{
   settings: Settings;
@@ -35,6 +35,10 @@ defineEmits<{
   openCodexHome: [];
   openAppData: [];
   openProfiles: [];
+  openProjectRepository: [];
+  openProjectIssues: [];
+  copySupportEmail: [];
+  openSupportEmail: [];
 }>();
 
 const selectedSettingsSection = ref<SettingsSection>("basic");
@@ -43,7 +47,8 @@ const settingsSections: Array<{ id: SettingsSection; label: string; summary: str
   { id: "login", label: "登录", summary: "OAuth 与登录缓存" },
   { id: "integrations", label: "集成", summary: "AutoFlow 接入" },
   { id: "updates", label: "更新", summary: "版本检查" },
-  { id: "security", label: "安全", summary: "凭据与数据位置" }
+  { id: "security", label: "安全", summary: "凭据与数据位置" },
+  { id: "about", label: "关于", summary: "项目与反馈" }
 ];
 
 function statusText(status: string) {
@@ -293,7 +298,7 @@ function maskedKey(value: string) {
       </section>
     </section>
 
-    <section v-else class="settings-section">
+    <section v-else-if="selectedSettingsSection === 'security'" class="settings-section">
       <header class="settings-section-header">
         <span class="eyebrow">Security</span>
         <h3>凭据与数据</h3>
@@ -320,6 +325,50 @@ function maskedKey(value: string) {
       <div class="warning">
         当前版本使用明文保存账号凭据。登录缓存只隔离 cookie/cache/localStorage；账号库包含 refresh token，请不要共享应用数据目录或导出的账号文件。
       </div>
+    </section>
+
+    <section v-else class="settings-section">
+      <header class="settings-section-header">
+        <span class="eyebrow">About</span>
+        <h3>关于 Codex Switch</h3>
+        <p>查看项目仓库、提交反馈，或通过邮箱联系维护者。</p>
+      </header>
+
+      <section class="settings-info-grid about-grid">
+        <article class="info-card about-card">
+          <div>
+            <span class="eyebrow">Repository</span>
+            <h3>项目仓库</h3>
+            <p>查看源码、发布记录和项目说明。</p>
+          </div>
+          <code>github.com/9ycrooked/CodexSwitch</code>
+          <div class="inline-actions">
+            <button class="secondary" type="button" :disabled="busy" @click="$emit('openProjectRepository')">
+              打开仓库
+            </button>
+            <button class="secondary" type="button" :disabled="busy" @click="$emit('openProjectIssues')">
+              提交 Issue
+            </button>
+          </div>
+        </article>
+
+        <article class="info-card about-card">
+          <div>
+            <span class="eyebrow">Contact</span>
+            <h3>问题反馈</h3>
+            <p>Bug、功能建议和使用问题都可以通过邮箱联系。</p>
+          </div>
+          <code>qianmang1@gmail.com</code>
+          <div class="inline-actions">
+            <button class="secondary" type="button" :disabled="busy" @click="$emit('copySupportEmail')">
+              复制邮箱
+            </button>
+            <button class="secondary" type="button" :disabled="busy" @click="$emit('openSupportEmail')">
+              写邮件
+            </button>
+          </div>
+        </article>
+      </section>
     </section>
 
     <div v-if="settingsDirty" class="settings-save-bar" role="status">

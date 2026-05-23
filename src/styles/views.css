@@ -648,7 +648,7 @@ dd {
 
 .settings-nav {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 8px;
   border: 1px solid color-mix(in srgb, var(--border-color) 72%, transparent);
   border-radius: var(--radius-md);
@@ -840,6 +840,33 @@ dd {
   padding: 7px 9px;
   color: var(--text-primary);
   background: var(--bg-secondary);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 12px;
+}
+
+.about-grid {
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.about-card {
+  align-content: start;
+  gap: 12px;
+}
+
+.about-card p {
+  margin-top: 6px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.about-card code {
+  overflow-wrap: anywhere;
+  border: 1px solid color-mix(in srgb, var(--border-color) 70%, transparent);
+  border-radius: 7px;
+  padding: 8px 10px;
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
   font-family: "JetBrains Mono", monospace;
   font-size: 12px;
 }

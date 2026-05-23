@@ -53,6 +53,9 @@ pub fn run() {
             locations::open_browser_profile_dir,
             locations::open_backups_dir,
             locations::open_backup_dir,
+            locations::open_project_repository,
+            locations::open_project_issues,
+            locations::open_support_email,
             settings::read_settings,
             settings::update_settings
         ])

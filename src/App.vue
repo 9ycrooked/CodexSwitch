@@ -54,6 +54,7 @@ const deleteAccountTarget = ref<AccountSummary | null>(null);
 const deleteAccountProfile = ref(false);
 const exportDialogOpen = ref(false);
 const selectedExportAccountIds = ref<string[]>([]);
+const SUPPORT_EMAIL = "qianmang1@gmail.com";
 
 const settings = reactive<Settings>({
   codex_home: "C:\\Users\\Y\\.codex",
@@ -454,6 +455,35 @@ const openProfiles = () => runOpenDirectory("profiles", openBrowserProfileDir);
 const openBackups = () => runOpenDirectory("backups", openBackupsDir);
 const openBackup = (backup: BackupSummary) => runOpenDirectory(`backup:${backup.id}`, () => openBackupDir(backup.id));
 
+async function runExternalAction(key: string, label: string, action: () => Promise<unknown>) {
+  const operationKey = `external:${key}`;
+  activeOperation.value = operationKey;
+  try {
+    await action();
+    setMessage("info", label);
+  } catch (err) {
+    setMessage("error", String(err));
+  } finally {
+    if (activeOperation.value === operationKey) activeOperation.value = "";
+  }
+}
+
+const openProjectRepository = () =>
+  runExternalAction("repository", "已打开项目仓库", api.openProjectRepository);
+const openProjectIssues = () =>
+  runExternalAction("issues", "已打开 Issue 页面", api.openProjectIssues);
+const openSupportEmail = () =>
+  runExternalAction("support-email", "已打开邮件应用", api.openSupportEmail);
+
+async function copySupportEmail() {
+  try {
+    await navigator.clipboard.writeText(SUPPORT_EMAIL);
+    setMessage("success", "邮箱已复制");
+  } catch (err) {
+    setMessage("error", `复制失败：${String(err)}`);
+  }
+}
+
 onMounted(async () => {
   busy.value = true;
   try {
@@ -632,6 +662,10 @@ onMounted(async () => {
         @open-codex-home="openCodexHome"
         @open-app-data="openAppData"
         @open-profiles="openProfiles"
+        @open-project-repository="openProjectRepository"
+        @open-project-issues="openProjectIssues"
+        @copy-support-email="copySupportEmail"
+        @open-support-email="openSupportEmail"
       />
     </section>
 

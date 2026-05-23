@@ -22,6 +22,15 @@ fn open_dir(path: &Path) -> AppResult<()> {
     Ok(())
 }
 
+fn open_external_target(target: &str) -> AppResult<()> {
+    hidden_command("rundll32")
+        .arg("url.dll,FileProtocolHandler")
+        .arg(target)
+        .spawn()
+        .map_err(stringify_io)?;
+    Ok(())
+}
+
 fn ensure_dir(path: &Path) -> AppResult<()> {
     fs::create_dir_all(path).map_err(stringify_io)
 }
@@ -115,6 +124,21 @@ pub fn open_backup_dir(backup_id: String) -> AppResult<()> {
     let dir = root.join(backup_id);
     let dir = validate_backup_target(&root, &dir)?;
     open_dir(&dir)
+}
+
+#[tauri::command]
+pub fn open_project_repository() -> AppResult<()> {
+    open_external_target("https://github.com/9ycrooked/CodexSwitch")
+}
+
+#[tauri::command]
+pub fn open_project_issues() -> AppResult<()> {
+    open_external_target("https://github.com/9ycrooked/CodexSwitch/issues")
+}
+
+#[tauri::command]
+pub fn open_support_email() -> AppResult<()> {
+    open_external_target("mailto:qianmang1@gmail.com")
 }
 
 #[cfg(test)]
