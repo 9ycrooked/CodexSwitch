@@ -73,11 +73,11 @@ function maskedKey(value: string) {
         v-for="section in settingsSections"
         :key="section.id"
         type="button"
+        :aria-label="`${section.label}：${section.summary}`"
         :class="{ active: selectedSettingsSection === section.id }"
         @click="selectedSettingsSection = section.id"
       >
         <strong>{{ section.label }}</strong>
-        <span>{{ section.summary }}</span>
       </button>
     </nav>
 
@@ -88,35 +88,54 @@ function maskedKey(value: string) {
         <p>管理 Codex 配置目录与进程关闭名单。</p>
       </header>
       <div class="settings-section-grid">
-        <section class="settings-info-grid settings-section-card full">
-          <article class="info-card">
-            <span class="eyebrow">App</span>
-            <h3>应用信息</h3>
-            <p>当前版本：{{ appVersion || "读取中" }}</p>
-            <p>最近检查：{{ lastUpdateCheckedAt ? formatDate(lastUpdateCheckedAt) : "从未检查" }}</p>
-          </article>
-          <article class="info-card">
-            <span class="eyebrow">Storage</span>
-            <h3>数据位置</h3>
-            <p>应用数据：{{ appPaths?.app_store_dir || "读取中" }}</p>
-            <div class="inline-actions">
-              <button class="secondary" type="button" :disabled="busy" @click="$emit('openAppData')">打开应用数据</button>
+        <section class="settings-card">
+          <div class="settings-card-heading">
+            <div>
+              <span class="eyebrow">Overview</span>
+              <h4>应用概览</h4>
             </div>
-          </article>
+          </div>
+          <div class="settings-info-grid">
+            <article class="info-card">
+              <span class="eyebrow">App</span>
+              <h3>应用信息</h3>
+              <p>当前版本：{{ appVersion || "读取中" }}</p>
+              <p>最近检查：{{ lastUpdateCheckedAt ? formatDate(lastUpdateCheckedAt) : "从未检查" }}</p>
+            </article>
+            <article class="info-card">
+              <span class="eyebrow">Storage</span>
+              <h3>数据位置</h3>
+              <p>应用数据：{{ appPaths?.app_store_dir || "读取中" }}</p>
+              <div class="inline-actions">
+                <button class="secondary" type="button" :disabled="busy" @click="$emit('openAppData')">打开应用数据</button>
+              </div>
+            </article>
+          </div>
         </section>
 
-        <label class="form-group">
-          <span>Codex 配置目录</span>
-          <div class="field-with-action">
-            <input v-model="settings.codex_home" />
-            <button class="secondary" type="button" :disabled="busy" @click="$emit('openCodexHome')">打开</button>
+        <section class="settings-card">
+          <div class="settings-card-heading">
+            <div>
+              <span class="eyebrow">Workspace</span>
+              <h4>路径与进程</h4>
+            </div>
+            <p>设置 Codex 配置目录，以及切换账号时需要关闭的进程名。</p>
           </div>
-        </label>
-        <label class="form-group">
-          <span>需要关闭的 Codex 进程</span>
-          <input :value="settings.process_names.join(', ')" @input="$emit('updateProcessNames', $event)" />
-          <small>多个进程名用英文逗号分隔。</small>
-        </label>
+          <div class="settings-form-grid">
+            <label class="form-group">
+              <span>Codex 配置目录</span>
+              <div class="field-with-action">
+                <input v-model="settings.codex_home" />
+                <button class="secondary" type="button" :disabled="busy" @click="$emit('openCodexHome')">打开</button>
+              </div>
+            </label>
+            <label class="form-group">
+              <span>需要关闭的 Codex 进程</span>
+              <input :value="settings.process_names.join(', ')" @input="$emit('updateProcessNames', $event)" />
+              <small>多个进程名用英文逗号分隔。</small>
+            </label>
+          </div>
+        </section>
       </div>
     </section>
 
@@ -127,31 +146,42 @@ function maskedKey(value: string) {
         <p>配置 OAuth 登录方式、回调端口和每个账号的登录缓存目录。</p>
       </header>
       <div class="settings-section-grid">
-        <label class="form-group">
-          <span>OAuth 登录方式</span>
-          <select v-model="settings.oauth_login_mode">
-            <option value="external">外部隔离浏览器（推荐）</option>
-            <option value="embedded">内置 WebView2（实验）</option>
-          </select>
-        </label>
-        <label class="form-group">
-          <span>登录回调端口</span>
-          <input v-model.number="settings.oauth_callback_port" type="number" min="1024" max="65535" />
-        </label>
-        <label class="form-group full">
-          <span>登录缓存目录</span>
-          <div class="field-with-action">
-            <input v-model="settings.browser_profile_dir" />
-            <button class="secondary" type="button" :disabled="busy" @click="$emit('openProfiles')">打开</button>
+        <section class="settings-card">
+          <div class="settings-card-heading">
+            <div>
+              <span class="eyebrow">OAuth login</span>
+              <h4>登录方式</h4>
+            </div>
+            <p>选择登录窗口模式，并管理隔离登录缓存目录。</p>
           </div>
-          <small>这里保存 OAuth 登录窗口的 cookie、缓存和本地存储，用于账号隔离。</small>
-        </label>
-        <label class="checkbox-row full">
-          <input v-model="settings.keep_login_profiles" type="checkbox" />
-          <span>保留账号登录缓存，便于下次继续使用该账号的登录会话</span>
-        </label>
+          <div class="settings-form-grid">
+            <label class="form-group">
+              <span>OAuth 登录方式</span>
+              <select v-model="settings.oauth_login_mode">
+                <option value="external">外部隔离浏览器（推荐）</option>
+                <option value="embedded">内置 WebView2（实验）</option>
+              </select>
+            </label>
+            <label class="form-group">
+              <span>登录回调端口</span>
+              <input v-model.number="settings.oauth_callback_port" type="number" min="1024" max="65535" />
+            </label>
+            <label class="form-group full">
+              <span>登录缓存目录</span>
+              <div class="field-with-action">
+                <input v-model="settings.browser_profile_dir" />
+                <button class="secondary" type="button" :disabled="busy" @click="$emit('openProfiles')">打开</button>
+              </div>
+              <small>这里保存 OAuth 登录窗口的 cookie、缓存和本地存储，用于账号隔离。</small>
+            </label>
+            <label class="checkbox-row full">
+              <input v-model="settings.keep_login_profiles" type="checkbox" />
+              <span>保留账号登录缓存，便于下次继续使用该账号的登录会话</span>
+            </label>
+          </div>
+        </section>
 
-        <section class="network-check-panel">
+        <section class="network-check-panel settings-card">
           <div class="panel-heading-row">
             <div>
               <span class="eyebrow">Login network</span>
@@ -162,14 +192,16 @@ function maskedKey(value: string) {
               {{ networkCheckRunning ? "检查中" : "立即检查" }}
             </button>
           </div>
-          <label class="checkbox-row">
-            <input v-model="settings.check_oauth_network_on_login" type="checkbox" />
-            <span>OAuth 登录前自动检查后端网络</span>
-          </label>
-          <label class="checkbox-row">
-            <input v-model="settings.check_egress_region" type="checkbox" />
-            <span>显示后端出口 IP 和国家代码（使用 Cloudflare trace）</span>
-          </label>
+          <div class="settings-form-grid compact">
+            <label class="checkbox-row">
+              <input v-model="settings.check_oauth_network_on_login" type="checkbox" />
+              <span>OAuth 登录前自动检查后端网络</span>
+            </label>
+            <label class="checkbox-row">
+              <input v-model="settings.check_egress_region" type="checkbox" />
+              <span>显示后端出口 IP 和国家代码（使用 Cloudflare trace）</span>
+            </label>
+          </div>
           <div v-if="networkCheckResult" class="network-check-result">
             <p>最近结果：{{ networkCheckResult.overall_status }}</p>
             <dl>
@@ -210,7 +242,7 @@ function maskedKey(value: string) {
         <h3>外部工具接入</h3>
         <p>按需开启本地 AutoFlow OAuth 接入服务。</p>
       </header>
-      <section class="autoflow-integration-panel">
+      <section class="autoflow-integration-panel settings-card">
         <div class="panel-heading-row">
           <div>
             <span class="eyebrow">AutoFlow</span>
@@ -221,16 +253,18 @@ function maskedKey(value: string) {
             {{ autoflowServerStatus?.running ? "运行中" : "未开启" }}
           </span>
         </div>
-        <label class="form-group">
-          <span>接入服务端口</span>
-          <input
-            v-model.number="settings.autoflow_oauth_server_port"
-            type="number"
-            min="1024"
-            max="65535"
-            :disabled="autoflowServerStatus?.running || autoflowServerBusy"
-          />
-        </label>
+        <div class="settings-form-grid">
+          <label class="form-group">
+            <span>接入服务端口</span>
+            <input
+              v-model.number="settings.autoflow_oauth_server_port"
+              type="number"
+              min="1024"
+              max="65535"
+              :disabled="autoflowServerStatus?.running || autoflowServerBusy"
+            />
+          </label>
+        </div>
         <div class="service-field-row">
           <span>AutoFlow 地址</span>
           <code>{{ autoflowServerStatus?.url || `http://127.0.0.1:${settings.autoflow_oauth_server_port}/admin/accounts` }}</code>
@@ -279,7 +313,7 @@ function maskedKey(value: string) {
         <h3>更新检查</h3>
         <p>启动检查和强制更新策略由发布包的 update-policy.json 控制，这里只保留手动检查入口。</p>
       </header>
-      <section class="update-settings-panel">
+      <section class="update-settings-panel settings-card">
         <div>
           <span class="eyebrow">Current policy</span>
           <h3>当前更新策略</h3>
@@ -304,25 +338,34 @@ function maskedKey(value: string) {
         <h3>凭据与数据</h3>
         <p>查看账号库和登录缓存的存储位置，确认本地凭据管理风险。</p>
       </header>
-      <section class="settings-info-grid">
-        <article class="info-card">
-          <span class="eyebrow">Account store</span>
-          <h3>账号库目录</h3>
-          <p>{{ appPaths?.app_store_dir || "读取中" }}</p>
-          <div class="inline-actions">
-            <button class="secondary" type="button" :disabled="busy" @click="$emit('openAppData')">打开应用数据</button>
+      <section class="settings-card">
+        <div class="settings-card-heading">
+          <div>
+            <span class="eyebrow">Local data</span>
+            <h4>数据位置</h4>
           </div>
-        </article>
-        <article class="info-card">
-          <span class="eyebrow">Login cache</span>
-          <h3>登录缓存目录</h3>
-          <p>{{ settings.browser_profile_dir || appPaths?.browser_profile_dir || "读取中" }}</p>
-          <div class="inline-actions">
-            <button class="secondary" type="button" :disabled="busy" @click="$emit('openProfiles')">打开登录缓存</button>
-          </div>
-        </article>
+          <p>账号库和登录缓存都保存在本机目录中。</p>
+        </div>
+        <div class="settings-info-grid">
+          <article class="info-card">
+            <span class="eyebrow">Account store</span>
+            <h3>账号库目录</h3>
+            <p>{{ appPaths?.app_store_dir || "读取中" }}</p>
+            <div class="inline-actions">
+              <button class="secondary" type="button" :disabled="busy" @click="$emit('openAppData')">打开应用数据</button>
+            </div>
+          </article>
+          <article class="info-card">
+            <span class="eyebrow">Login cache</span>
+            <h3>登录缓存目录</h3>
+            <p>{{ settings.browser_profile_dir || appPaths?.browser_profile_dir || "读取中" }}</p>
+            <div class="inline-actions">
+              <button class="secondary" type="button" :disabled="busy" @click="$emit('openProfiles')">打开登录缓存</button>
+            </div>
+          </article>
+        </div>
       </section>
-      <div class="warning">
+      <div class="warning settings-callout">
         当前版本使用明文保存账号凭据。登录缓存只隔离 cookie/cache/localStorage；账号库包含 refresh token，请不要共享应用数据目录或导出的账号文件。
       </div>
     </section>
@@ -336,10 +379,18 @@ function maskedKey(value: string) {
 
       <section class="settings-info-grid about-grid">
         <article class="info-card about-card">
-          <div>
-            <span class="eyebrow">Repository</span>
-            <h3>项目仓库</h3>
-            <p>查看源码、发布记录和项目说明。</p>
+          <div class="about-card-head">
+            <div class="about-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path d="M9 19c-4.3 1.4-4.3-2.1-6-2.5" />
+                <path d="M15 22v-3.9a3.4 3.4 0 0 0-.9-2.6c3-.3 6.1-1.5 6.1-6.7a5.2 5.2 0 0 0-1.4-3.6 4.8 4.8 0 0 0-.1-3.6s-1.1-.3-3.7 1.4a12.9 12.9 0 0 0-6.8 0C5.6.3 4.5.6 4.5.6a4.8 4.8 0 0 0-.1 3.6A5.2 5.2 0 0 0 3 7.8c0 5.2 3.1 6.4 6.1 6.7a3 3 0 0 0-.8 1.9V22" />
+              </svg>
+            </div>
+            <div>
+              <span class="eyebrow">Repository</span>
+              <h3>项目仓库</h3>
+              <p>查看源码、发布记录和项目说明。</p>
+            </div>
           </div>
           <code>github.com/9ycrooked/CodexSwitch</code>
           <div class="inline-actions">
@@ -353,10 +404,18 @@ function maskedKey(value: string) {
         </article>
 
         <article class="info-card about-card">
-          <div>
-            <span class="eyebrow">Contact</span>
-            <h3>问题反馈</h3>
-            <p>Bug、功能建议和使用问题都可以通过邮箱联系。</p>
+          <div class="about-card-head">
+            <div class="about-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path d="M4 4h16v16H4z" />
+                <path d="m4 7 8 6 8-6" />
+              </svg>
+            </div>
+            <div>
+              <span class="eyebrow">Contact</span>
+              <h3>问题反馈</h3>
+              <p>Bug、功能建议和使用问题都可以通过邮箱联系。</p>
+            </div>
           </div>
           <code>qianmang1@gmail.com</code>
           <div class="inline-actions">

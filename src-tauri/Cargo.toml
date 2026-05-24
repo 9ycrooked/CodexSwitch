@@ -1,6 +1,6 @@
 [package]
 name = "codex-account-switcher"
-version = "0.3.3"
+version = "0.3.4"
 description = "A local Codex account switcher"
 authors = ["Codex"]
 edition = "2021"
