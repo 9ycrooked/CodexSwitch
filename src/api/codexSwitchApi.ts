@@ -4,6 +4,7 @@ import type {
   AccountBundleImportResult,
   AccountSummary,
   AppPaths,
+  AuthJsonExportResult,
   AutoFlowOAuthServerStatus,
   BackupSummary,
   CodexState,
@@ -96,6 +97,10 @@ export function importAccountBundle(path: string) {
 
 export function exportAccountBundle(accountIds: string[], outputPath: string) {
   return invoke<AccountBundleExportResult>("export_account_bundle", { accountIds, outputPath });
+}
+
+export function exportCurrentAuthJson(outputPath: string) {
+  return invoke<AuthJsonExportResult>("export_current_auth_json", { outputPath });
 }
 
 export function deleteAccount(accountId: string, deleteProfile: boolean) {

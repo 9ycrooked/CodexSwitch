@@ -1,8 +1,9 @@
 use std::fs;
-use std::path::PathBuf;
+use std::io::Write;
+use std::path::{Path, PathBuf};
 
 use crate::account_bundle::{export_account_bundle_to_path, import_account_bundle_from_path};
-use crate::accounts::load_account;
+use crate::accounts::{current_identity_from_auth, load_account};
 use crate::backups::create_backup;
 use crate::codex_home::{
     account_warnings, capture_codex_desktop_launch_path, close_codex_processes_fast,
@@ -12,10 +13,16 @@ use crate::config_merge::merge_config_files;
 use crate::error::{run_blocking, stringify_io, AppResult};
 use crate::io::{atomic_write_json, atomic_write_text};
 use crate::models::{
-    AccountBundleExportResult, AccountBundleImportResult, AccountSummary, SwitchResult,
+    AccountBundleExportResult, AccountBundleImportResult, AccountSummary, AuthJsonExportResult,
+    SwitchResult,
 };
 use crate::paths::{account_dir, app_store_dir};
 use crate::settings::load_settings;
+use serde_json::Value;
+use zip::write::SimpleFileOptions;
+use zip::{CompressionMethod, ZipWriter};
+
+const MAX_CURRENT_AUTH_EXPORT_BYTES: u64 = 4 * 1024 * 1024;
 
 #[tauri::command]
 pub async fn import_accounts(paths: Vec<String>) -> AppResult<Vec<AccountSummary>> {
@@ -33,6 +40,11 @@ pub async fn export_account_bundle(
     output_path: String,
 ) -> AppResult<AccountBundleExportResult> {
     run_blocking(move || export_account_bundle_blocking(account_ids, output_path)).await
+}
+
+#[tauri::command]
+pub async fn export_current_auth_json(output_path: String) -> AppResult<AuthJsonExportResult> {
+    run_blocking(move || export_current_auth_json_blocking(output_path)).await
 }
 
 #[tauri::command]
@@ -122,6 +134,97 @@ fn export_account_bundle_blocking(
         accounts.push(load_account(&account_id)?);
     }
     export_account_bundle_to_path(&accounts, &output_path)
+}
+
+fn export_current_auth_json_blocking(output_path: String) -> AppResult<AuthJsonExportResult> {
+    let output_path = PathBuf::from(output_path);
+    if output_path
+        .extension()
+        .and_then(|item| item.to_str())
+        .is_none_or(|ext| !ext.eq_ignore_ascii_case("zip"))
+    {
+        return Err("导出文件必须是 .zip 压缩包。".to_string());
+    }
+
+    let settings = load_settings()?;
+    let auth_path = PathBuf::from(settings.codex_home).join("auth.json");
+    if !auth_path.exists() {
+        return Err(format!("当前 Codex home 中不存在 auth.json：{}", auth_path.display()));
+    }
+    if !auth_path.is_file() {
+        return Err(format!("auth.json 不是文件：{}", auth_path.display()));
+    }
+    let metadata = fs::metadata(&auth_path).map_err(stringify_io)?;
+    if metadata.len() > MAX_CURRENT_AUTH_EXPORT_BYTES {
+        return Err("auth.json 文件过大，已拒绝导出。".to_string());
+    }
+
+    let auth_bytes = fs::read(&auth_path).map_err(stringify_io)?;
+    let auth_json: Value = serde_json::from_slice(&auth_bytes)
+        .map_err(|err| format!("auth.json 不是有效 JSON：{err}"))?;
+    let folder_name = current_auth_export_folder_name(&auth_json);
+    write_current_auth_zip(&output_path, &folder_name, &auth_bytes)?;
+
+    Ok(AuthJsonExportResult {
+        path: output_path.to_string_lossy().to_string(),
+        folder_name,
+    })
+}
+
+fn write_current_auth_zip(
+    output_path: &Path,
+    folder_name: &str,
+    auth_bytes: &[u8],
+) -> AppResult<()> {
+    if let Some(parent) = output_path.parent() {
+        fs::create_dir_all(parent).map_err(stringify_io)?;
+    }
+
+    let file = fs::File::create(output_path).map_err(stringify_io)?;
+    let mut writer = ZipWriter::new(file);
+    let options = SimpleFileOptions::default().compression_method(CompressionMethod::Deflated);
+    writer
+        .start_file(format!("{folder_name}/auth.json"), options)
+        .map_err(|err| err.to_string())?;
+    writer.write_all(auth_bytes).map_err(stringify_io)?;
+    writer.finish().map_err(|err| err.to_string())?;
+    Ok(())
+}
+
+fn current_auth_export_folder_name(auth_json: &Value) -> String {
+    let identity = current_identity_from_auth(auth_json);
+    let raw = identity
+        .email
+        .or(identity.account_id)
+        .unwrap_or_else(|| "unknown-account".to_string());
+    sanitize_auth_export_folder_name(&raw)
+}
+
+fn sanitize_auth_export_folder_name(value: &str) -> String {
+    let mut out = String::with_capacity(value.len());
+    for ch in value.chars() {
+        if ch.is_control() || matches!(ch, '\\' | '/' | ':' | '*' | '?' | '"' | '<' | '>' | '|') {
+            out.push('-');
+        } else {
+            out.push(ch);
+        }
+    }
+
+    let safe = out
+        .trim()
+        .trim_matches(|ch| ch == '.' || ch == '-' || ch == ' ')
+        .chars()
+        .take(120)
+        .collect::<String>();
+    let safe = safe
+        .trim_end_matches(|ch| ch == '.' || ch == ' ')
+        .to_string();
+
+    if safe.is_empty() {
+        "unknown-account".to_string()
+    } else {
+        safe
+    }
 }
 
 fn legacy_import_unsupported_message() -> String {
@@ -261,5 +364,58 @@ mod tests {
         .expect_err("legacy files should be rejected");
 
         assert!(err.contains("旧格式"));
+    }
+
+    #[test]
+    fn auth_export_folder_uses_email_and_sanitizes_windows_chars() {
+        let auth_json = serde_json::json!({
+            "email": r#"bad:name/user?@example.com."#,
+            "tokens": {
+                "account_id": "acct-1"
+            }
+        });
+
+        assert_eq!(
+            current_auth_export_folder_name(&auth_json),
+            "bad-name-user-@example.com"
+        );
+    }
+
+    #[test]
+    fn auth_export_folder_uses_email_from_exported_auth_id_token() {
+        use base64::Engine;
+        use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+
+        let claims = serde_json::json!({
+            "email": "real-user@example.com",
+            "https://api.openai.com/auth": {
+                "chatgpt_account_id": "acct-from-claims"
+            }
+        });
+        let token = format!(
+            "header.{}.sig",
+            URL_SAFE_NO_PAD.encode(serde_json::to_vec(&claims).unwrap())
+        );
+        let auth_json = serde_json::json!({
+            "auth_mode": "chatgpt",
+            "tokens": {
+                "access_token": "access",
+                "id_token": token,
+                "refresh_token": "refresh",
+                "account_id": "acct-from-token"
+            }
+        });
+
+        assert_eq!(
+            current_auth_export_folder_name(&auth_json),
+            "real-user@example.com"
+        );
+    }
+
+    #[test]
+    fn auth_export_folder_falls_back_to_unknown() {
+        let auth_json = serde_json::json!({});
+
+        assert_eq!(current_auth_export_folder_name(&auth_json), "unknown-account");
     }
 }

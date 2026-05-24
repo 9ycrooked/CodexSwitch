@@ -314,21 +314,32 @@ function maskedKey(value: string) {
         <p>启动检查和强制更新策略由发布包的 update-policy.json 控制，这里只保留手动检查入口。</p>
       </header>
       <section class="update-settings-panel settings-card">
-        <div>
-          <span class="eyebrow">Current policy</span>
-          <h3>当前更新策略</h3>
-          <p>当前策略：{{ updatePolicySource }}</p>
-          <small v-if="updatePolicyError">发布配置读取失败：{{ updatePolicyError }}</small>
-          <small v-else>最近检查：{{ lastUpdateCheckedAt ? formatDate(lastUpdateCheckedAt) : "从未检查" }}</small>
+        <div class="update-settings-content">
+          <div class="panel-heading-row">
+            <div>
+              <span class="eyebrow">Current policy</span>
+              <h3>当前更新策略</h3>
+              <p>当前策略：{{ updatePolicySource }}</p>
+              <small v-if="updatePolicyError">发布配置读取失败：{{ updatePolicyError }}</small>
+              <small v-else>最近检查：{{ lastUpdateCheckedAt ? formatDate(lastUpdateCheckedAt) : "从未检查" }}</small>
+            </div>
+            <button
+              class="secondary"
+              type="button"
+              :disabled="busy || updateChecking || updateDownloading"
+              @click="$emit('checkForUpdates')"
+            >
+              {{ updateChecking ? "检查中" : "检查更新" }}
+            </button>
+          </div>
+          <label class="checkbox-row update-manual-only-option">
+            <input v-model="settings.manual_update_check_only" type="checkbox" />
+            <span>
+              仅手动检查更新
+              <small>开启后启动时不会自动检查或弹出更新提醒，只有点击“检查更新”才会联网检查。</small>
+            </span>
+          </label>
         </div>
-        <button
-          class="secondary"
-          type="button"
-          :disabled="busy || updateChecking || updateDownloading"
-          @click="$emit('checkForUpdates')"
-        >
-          {{ updateChecking ? "检查中" : "检查更新" }}
-        </button>
       </section>
     </section>
 

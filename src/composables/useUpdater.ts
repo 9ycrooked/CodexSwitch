@@ -77,6 +77,17 @@ export function useUpdater(settings: Settings, setMessage: (type: ToastType, mes
 
   async function runUpdateCheck(options: { manual?: boolean } = {}) {
     const manual = Boolean(options.manual);
+    if (!manual && settings.manual_update_check_only) {
+      Object.assign(updatePolicy, {
+        check_updates_on_startup: false,
+        force_update_on_startup: false,
+        message: null
+      });
+      updatePolicySource.value = "仅手动检查";
+      updatePolicyError.value = "";
+      return;
+    }
+
     const policy = await loadUpdatePolicy();
     if (!manual && !policy.check_updates_on_startup) return;
 

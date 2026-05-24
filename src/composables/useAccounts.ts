@@ -123,6 +123,34 @@ export function useAccounts(deps: {
     return exported;
   }
 
+  function compactTimestamp() {
+    return new Date()
+      .toISOString()
+      .replace(/\.\d{3}Z$/, "")
+      .replace(/[-:]/g, "")
+      .replace("T", "-");
+  }
+
+  async function exportCurrentAuthJsonOnly() {
+    const outputPath = await save({
+      defaultPath: `codex-auth-${compactTimestamp()}.zip`,
+      filters: [{ name: "Codex auth.json ZIP", extensions: ["zip"] }]
+    });
+    if (!outputPath) return false;
+
+    let exported = false;
+    await runOperation("accounts:export-auth", async () => {
+      try {
+        const result = await api.exportCurrentAuthJson(outputPath);
+        deps.setMessage("success", `auth.json 已导出到 ${result.folder_name}/auth.json`);
+        exported = true;
+      } catch (err) {
+        deps.setMessage("error", String(err));
+      }
+    });
+    return exported;
+  }
+
   async function confirmNetworkForOAuth() {
     if (!deps.settings.check_oauth_network_on_login) return true;
     const networkResult = await api.checkOauthNetworkExit(deps.settings.check_egress_region);
@@ -253,6 +281,7 @@ export function useAccounts(deps: {
     chooseAndImport,
     importBundlePaths,
     exportSelectedAccounts,
+    exportCurrentAuthJsonOnly,
     startOAuthLogin,
     closeOAuthLogin,
     refreshTokens,

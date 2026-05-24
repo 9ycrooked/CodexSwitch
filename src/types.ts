@@ -93,6 +93,7 @@ export type Settings = {
   oauth_login_mode: string;
   check_updates_on_startup: boolean;
   force_update_on_startup: boolean;
+  manual_update_check_only: boolean;
   check_oauth_network_on_login: boolean;
   check_egress_region: boolean;
   autoflow_oauth_server_enabled: boolean;
@@ -128,6 +129,11 @@ export type AccountBundleExportResult = {
   path: string;
   exported_count: number;
   included_profile_count: number;
+};
+
+export type AuthJsonExportResult = {
+  path: string;
+  folder_name: string;
 };
 
 export type AccountBundleImportFailure = {

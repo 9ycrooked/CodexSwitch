@@ -777,10 +777,8 @@ dd {
 }
 
 .update-settings-panel {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
+  display: grid;
+  gap: 14px;
 }
 
 .update-settings-panel h3 {
@@ -799,6 +797,24 @@ dd {
   color: var(--text-tertiary);
   font-size: 12px;
   line-height: 1.5;
+}
+
+.update-settings-content {
+  display: grid;
+  gap: 14px;
+}
+
+.update-manual-only-option {
+  border-top: 1px solid color-mix(in srgb, var(--border-color) 62%, transparent);
+  padding-top: 12px;
+}
+
+.update-manual-only-option small {
+  margin-top: 3px;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.45;
 }
 
 .autoflow-integration-panel {

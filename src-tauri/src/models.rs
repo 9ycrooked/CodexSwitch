@@ -74,6 +74,12 @@ pub struct AccountBundleExportResult {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AuthJsonExportResult {
+    pub path: String,
+    pub folder_name: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AccountBundleImportFailure {
     pub id: Option<String>,
     pub path: Option<String>,

@@ -530,13 +530,11 @@ fn open_oauth_external(app: &AppHandle, auth_url: &str, profile_dir: &Path) -> A
         .find(|path| path.exists())
     {
         let browser = browser.to_string_lossy();
-        crate::process::hidden_command(browser.as_ref())
-            .arg(format!("--user-data-dir={}", profile_dir.to_string_lossy()))
-            .arg("--new-window")
-            .arg(format!("--window-size={width},{height}"))
-            .arg(auth_url)
-            .spawn()
-            .map_err(stringify_io)?;
+        let mut command = crate::process::hidden_command(browser.as_ref());
+        command.args(oauth_external_browser_args(
+            profile_dir, width, height, auth_url,
+        ));
+        command.spawn().map_err(stringify_io)?;
         return Ok(());
     }
     crate::process::hidden_command("rundll32")
@@ -544,6 +542,25 @@ fn open_oauth_external(app: &AppHandle, auth_url: &str, profile_dir: &Path) -> A
         .spawn()
         .map_err(stringify_io)?;
     Ok(())
+}
+
+fn oauth_external_browser_args(
+    profile_dir: &Path,
+    width: u32,
+    height: u32,
+    auth_url: &str,
+) -> Vec<String> {
+    vec![
+        format!("--user-data-dir={}", profile_dir.to_string_lossy()),
+        "--no-first-run".to_string(),
+        "--no-default-browser-check".to_string(),
+        "--disable-default-apps".to_string(),
+        "--disable-search-engine-choice-screen".to_string(),
+        "--disable-sync".to_string(),
+        "--new-window".to_string(),
+        format!("--window-size={width},{height}"),
+        auth_url.to_string(),
+    ]
 }
 
 fn oauth_external_window_size(app: &AppHandle) -> (u32, u32) {
@@ -860,6 +877,27 @@ mod tests {
                 .and_then(Value::as_str),
             Some("acct-autoflow")
         );
+    }
+
+    #[test]
+    fn oauth_external_browser_args_skip_chrome_first_run_prompts() {
+        let args = oauth_external_browser_args(
+            Path::new(r"C:\Profiles\acct-1"),
+            1120,
+            760,
+            "http://localhost/auth",
+        );
+
+        assert!(args.iter().any(|arg| arg == "--no-first-run"));
+        assert!(args.iter().any(|arg| arg == "--no-default-browser-check"));
+        assert!(args.iter().any(|arg| arg == "--disable-default-apps"));
+        assert!(args
+            .iter()
+            .any(|arg| arg == "--disable-search-engine-choice-screen"));
+        assert!(args.iter().any(|arg| arg == "--disable-sync"));
+        assert!(args.iter().any(|arg| arg == "--new-window"));
+        assert!(args.iter().any(|arg| arg == "--window-size=1120,760"));
+        assert_eq!(args.last().map(String::as_str), Some("http://localhost/auth"));
     }
 
     #[test]

@@ -23,6 +23,8 @@ pub struct Settings {
     pub check_updates_on_startup: bool,
     #[serde(default)]
     pub force_update_on_startup: bool,
+    #[serde(default)]
+    pub manual_update_check_only: bool,
     #[serde(default = "default_true")]
     pub check_oauth_network_on_login: bool,
     #[serde(default)]
@@ -59,6 +61,7 @@ pub fn default_settings() -> Settings {
         oauth_login_mode: default_oauth_login_mode(),
         check_updates_on_startup: default_true(),
         force_update_on_startup: false,
+        manual_update_check_only: false,
         check_oauth_network_on_login: true,
         check_egress_region: false,
         autoflow_oauth_server_enabled: false,
@@ -109,6 +112,7 @@ pub(crate) fn sanitize_settings(settings: Settings) -> AppResult<Settings> {
         oauth_login_mode: sanitize_oauth_login_mode(&settings.oauth_login_mode),
         check_updates_on_startup: settings.check_updates_on_startup,
         force_update_on_startup: settings.force_update_on_startup,
+        manual_update_check_only: settings.manual_update_check_only,
         check_oauth_network_on_login: settings.check_oauth_network_on_login,
         check_egress_region: settings.check_egress_region,
         autoflow_oauth_server_enabled: settings.autoflow_oauth_server_enabled,
@@ -189,6 +193,7 @@ mod tests {
 
         assert!(settings.check_updates_on_startup);
         assert!(!settings.force_update_on_startup);
+        assert!(!settings.manual_update_check_only);
         assert!(settings.check_oauth_network_on_login);
         assert!(!settings.check_egress_region);
     }

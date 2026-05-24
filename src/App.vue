@@ -65,6 +65,7 @@ const settings = reactive<Settings>({
   oauth_login_mode: "external",
   check_updates_on_startup: true,
   force_update_on_startup: false,
+  manual_update_check_only: false,
   check_oauth_network_on_login: true,
   check_egress_region: false,
   autoflow_oauth_server_enabled: false,
@@ -104,6 +105,7 @@ function settingsSnapshot(value: Settings) {
     oauth_login_mode: value.oauth_login_mode,
     check_updates_on_startup: value.check_updates_on_startup,
     force_update_on_startup: value.force_update_on_startup,
+    manual_update_check_only: value.manual_update_check_only,
     check_oauth_network_on_login: value.check_oauth_network_on_login,
     check_egress_region: value.check_egress_region,
     autoflow_oauth_server_enabled: value.autoflow_oauth_server_enabled,
@@ -214,6 +216,7 @@ const {
 const {
   chooseAndImport,
   exportSelectedAccounts,
+  exportCurrentAuthJsonOnly,
   startOAuthLogin,
   closeOAuthLogin,
   refreshTokens,
@@ -305,6 +308,10 @@ async function confirmExportAccounts() {
   }
 }
 
+async function confirmExportCurrentAuthJson() {
+  await exportCurrentAuthJsonOnly();
+}
+
 async function confirmDeleteAccount() {
   const account = deleteAccountTarget.value;
   if (!account) return;
@@ -332,6 +339,7 @@ async function saveSettings() {
       oauth_login_mode: settings.oauth_login_mode,
       check_updates_on_startup: settings.check_updates_on_startup,
       force_update_on_startup: settings.force_update_on_startup,
+      manual_update_check_only: settings.manual_update_check_only,
       check_oauth_network_on_login: settings.check_oauth_network_on_login,
       check_egress_region: settings.check_egress_region,
       autoflow_oauth_server_enabled: Boolean(settings.autoflow_oauth_server_enabled),
@@ -723,6 +731,23 @@ onMounted(async () => {
           <p>导出的 ZIP 会包含所选账号的 auth.json，以及该账号绑定的浏览器 Profile（cookie、缓存和本地存储）。</p>
           <p>这个文件等同于登录凭据，请只在自己的设备之间迁移。</p>
         </div>
+
+        <section class="export-auth-only-panel">
+          <div>
+            <p class="eyebrow">当前 Codex home</p>
+            <h3>仅导出 auth.json</h3>
+            <p>生成一个 ZIP，内部按账号邮箱建立文件夹，并只放入当前正在使用的 auth.json。</p>
+            <small>auth.json 包含 refresh token，请不要分享给他人。</small>
+          </div>
+          <button
+            class="secondary"
+            type="button"
+            :disabled="isOperationActive('accounts:export-auth')"
+            @click="confirmExportCurrentAuthJson"
+          >
+            {{ isOperationActive("accounts:export-auth") ? "正在导出" : "仅导出 auth.json" }}
+          </button>
+        </section>
 
         <label class="checkbox-row export-select-all">
           <input
