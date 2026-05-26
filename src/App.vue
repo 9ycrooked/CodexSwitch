@@ -68,6 +68,7 @@ const settings = reactive<Settings>({
   manual_update_check_only: false,
   check_oauth_network_on_login: true,
   check_egress_region: false,
+  backend_proxy_url: "",
   autoflow_oauth_server_enabled: false,
   autoflow_oauth_server_port: 8080,
   autoflow_oauth_admin_key: ""
@@ -108,6 +109,7 @@ function settingsSnapshot(value: Settings) {
     manual_update_check_only: value.manual_update_check_only,
     check_oauth_network_on_login: value.check_oauth_network_on_login,
     check_egress_region: value.check_egress_region,
+    backend_proxy_url: value.backend_proxy_url,
     autoflow_oauth_server_enabled: value.autoflow_oauth_server_enabled,
     autoflow_oauth_server_port: value.autoflow_oauth_server_port,
     autoflow_oauth_admin_key: value.autoflow_oauth_admin_key
@@ -345,6 +347,7 @@ async function saveSettings() {
       manual_update_check_only: settings.manual_update_check_only,
       check_oauth_network_on_login: settings.check_oauth_network_on_login,
       check_egress_region: settings.check_egress_region,
+      backend_proxy_url: settings.backend_proxy_url,
       autoflow_oauth_server_enabled: Boolean(settings.autoflow_oauth_server_enabled),
       autoflow_oauth_server_port: Number(settings.autoflow_oauth_server_port),
       autoflow_oauth_admin_key: settings.autoflow_oauth_admin_key

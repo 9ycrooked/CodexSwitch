@@ -2,6 +2,7 @@ use std::time::{Duration, Instant};
 
 use crate::accounts::now_string;
 use crate::error::{run_blocking, AppResult};
+use crate::http_client::backend_client_builder;
 use crate::models::{NetworkExitCheckResult, NetworkProbeResult};
 use crate::settings::load_settings;
 
@@ -131,8 +132,7 @@ fn check_oauth_network_exit_blocking(
 ) -> AppResult<NetworkExitCheckResult> {
     let settings = load_settings()?;
     let include_egress_region = include_egress_region.unwrap_or(settings.check_egress_region);
-    let client = reqwest::blocking::Client::builder()
-        .timeout(Duration::from_secs(10))
+    let client = backend_client_builder(&settings.backend_proxy_url, Duration::from_secs(10))?
         .redirect(reqwest::redirect::Policy::limited(5))
         .build()
         .map_err(|err| err.to_string())?;

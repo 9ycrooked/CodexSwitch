@@ -6,6 +6,7 @@ mod codex_home;
 mod commands;
 mod config_merge;
 mod error;
+mod http_client;
 mod io;
 mod locations;
 mod models;

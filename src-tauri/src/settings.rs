@@ -30,6 +30,8 @@ pub struct Settings {
     #[serde(default)]
     pub check_egress_region: bool,
     #[serde(default)]
+    pub backend_proxy_url: String,
+    #[serde(default)]
     pub autoflow_oauth_server_enabled: bool,
     #[serde(default = "default_autoflow_oauth_server_port")]
     pub autoflow_oauth_server_port: u16,
@@ -64,6 +66,7 @@ pub fn default_settings() -> Settings {
         manual_update_check_only: false,
         check_oauth_network_on_login: true,
         check_egress_region: false,
+        backend_proxy_url: String::new(),
         autoflow_oauth_server_enabled: false,
         autoflow_oauth_server_port: default_autoflow_oauth_server_port(),
         autoflow_oauth_admin_key: String::new(),
@@ -115,6 +118,7 @@ pub(crate) fn sanitize_settings(settings: Settings) -> AppResult<Settings> {
         manual_update_check_only: settings.manual_update_check_only,
         check_oauth_network_on_login: settings.check_oauth_network_on_login,
         check_egress_region: settings.check_egress_region,
+        backend_proxy_url: settings.backend_proxy_url.trim().to_string(),
         autoflow_oauth_server_enabled: settings.autoflow_oauth_server_enabled,
         autoflow_oauth_server_port: settings.autoflow_oauth_server_port,
         autoflow_oauth_admin_key: settings.autoflow_oauth_admin_key.trim().to_string(),
@@ -196,6 +200,7 @@ mod tests {
         assert!(!settings.manual_update_check_only);
         assert!(settings.check_oauth_network_on_login);
         assert!(!settings.check_egress_region);
+        assert_eq!(settings.backend_proxy_url, "");
     }
 
     #[test]
@@ -234,6 +239,16 @@ mod tests {
         assert!(!settings.autoflow_oauth_server_enabled);
         assert_eq!(settings.autoflow_oauth_server_port, 8080);
         assert_eq!(settings.autoflow_oauth_admin_key, "");
+    }
+
+    #[test]
+    fn update_settings_trims_backend_proxy_url() {
+        let mut settings = default_settings();
+        settings.backend_proxy_url = "  http://127.0.0.1:7890  ".to_string();
+
+        let sanitized = sanitize_settings(settings).expect("settings should sanitize");
+
+        assert_eq!(sanitized.backend_proxy_url, "http://127.0.0.1:7890");
     }
 
     #[test]

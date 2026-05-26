@@ -21,6 +21,7 @@ use crate::accounts::{
     save_account_record, summary_from_auth_json,
 };
 use crate::error::{run_blocking, stringify_io, AppResult};
+use crate::http_client::backend_client;
 use crate::models::{AccountSummary, OAuthLoginStart, TokenResponse};
 use crate::settings::{self, load_settings};
 
@@ -575,10 +576,7 @@ pub(crate) fn exchange_code_for_tokens(
     redirect_uri: &str,
     code_verifier: &str,
 ) -> AppResult<TokenResponse> {
-    let client = reqwest::blocking::Client::builder()
-        .timeout(Duration::from_secs(60))
-        .build()
-        .map_err(|err| err.to_string())?;
+    let client = backend_client(Duration::from_secs(60))?;
     let response = client
         .post(OAUTH_TOKEN_URL)
         .form(&[
@@ -594,10 +592,7 @@ pub(crate) fn exchange_code_for_tokens(
 }
 
 fn refresh_tokens(refresh_token: &str) -> AppResult<TokenResponse> {
-    let client = reqwest::blocking::Client::builder()
-        .timeout(Duration::from_secs(60))
-        .build()
-        .map_err(|err| err.to_string())?;
+    let client = backend_client(Duration::from_secs(60))?;
     let response = client
         .post(OAUTH_TOKEN_URL)
         .form(&[

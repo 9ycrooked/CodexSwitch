@@ -178,6 +178,11 @@ function maskedKey(value: string) {
               <input v-model="settings.keep_login_profiles" type="checkbox" />
               <span>保留账号登录缓存，便于下次继续使用该账号的登录会话</span>
             </label>
+            <label class="form-group full">
+              <span>后端代理地址</span>
+              <input v-model="settings.backend_proxy_url" placeholder="http://127.0.0.1:7890" />
+              <small>留空表示直连；填写后 OAuth token exchange、刷新 token 和登录前网络检查都会走这个代理。</small>
+            </label>
           </div>
         </section>
 
