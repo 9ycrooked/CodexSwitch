@@ -340,7 +340,7 @@ dependencies = [
 
 [[package]]
 name = "codex-account-switcher"
-version = "0.3.6"
+version = "0.3.7"
 dependencies = [
  "base64 0.22.1",
  "chrono",

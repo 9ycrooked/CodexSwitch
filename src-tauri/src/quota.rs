@@ -5,6 +5,7 @@ use std::time::Duration;
 
 use crate::accounts::{list_accounts, load_account, now_string, save_account_record};
 use crate::error::{run_blocking, AppResult};
+use crate::http_client::backend_client;
 use crate::models::{CodexQuotaWindow, QuotaState, StoredAccount, UsageState};
 
 const CODEX_BASE_URL: &str = "https://chatgpt.com/backend-api/codex";
@@ -100,13 +101,10 @@ fn probe_quota(token: &str, account_id: &str, model: &str) -> QuotaState {
         }],
         "stream": false
     });
-    let client = match reqwest::blocking::Client::builder()
-        .timeout(Duration::from_secs(60))
-        .build()
-    {
+    let client = match backend_client(Duration::from_secs(60)) {
         Ok(client) => client,
         Err(err) => {
-            return quota_failure(&checked_at, model, err.to_string());
+            return quota_failure(&checked_at, model, err);
         }
     };
     let mut request = client
@@ -210,12 +208,9 @@ fn fetch_codex_usage_for_account(account: &StoredAccount) -> AppResult<UsageStat
         .and_then(Value::as_str)
         .or(account.summary.account_id.as_deref())
         .unwrap_or_default();
-    let client = match reqwest::blocking::Client::builder()
-        .timeout(Duration::from_secs(60))
-        .build()
-    {
+    let client = match backend_client(Duration::from_secs(60)) {
         Ok(client) => client,
-        Err(err) => return usage_failure(&checked_at, None, err.to_string(), None),
+        Err(err) => return usage_failure(&checked_at, None, err, None),
     };
     let mut request = client
         .get(CODEX_USAGE_URL)
