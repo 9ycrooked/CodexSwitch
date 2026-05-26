@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -14,15 +15,13 @@ use crate::error::{run_blocking, stringify_io, AppResult};
 use crate::io::{atomic_write_json, atomic_write_text};
 use crate::models::{
     AccountBundleExportResult, AccountBundleImportResult, AccountSummary, AuthJsonExportResult,
-    SwitchResult,
+    StoredAccount, SwitchResult,
 };
 use crate::paths::{account_dir, app_store_dir};
 use crate::settings::load_settings;
 use serde_json::Value;
 use zip::write::SimpleFileOptions;
 use zip::{CompressionMethod, ZipWriter};
-
-const MAX_CURRENT_AUTH_EXPORT_BYTES: u64 = 4 * 1024 * 1024;
 
 #[tauri::command]
 pub async fn import_accounts(paths: Vec<String>) -> AppResult<Vec<AccountSummary>> {
@@ -43,8 +42,11 @@ pub async fn export_account_bundle(
 }
 
 #[tauri::command]
-pub async fn export_current_auth_json(output_path: String) -> AppResult<AuthJsonExportResult> {
-    run_blocking(move || export_current_auth_json_blocking(output_path)).await
+pub async fn export_selected_auth_json(
+    account_ids: Vec<String>,
+    output_path: String,
+) -> AppResult<AuthJsonExportResult> {
+    run_blocking(move || export_selected_auth_json_blocking(account_ids, output_path)).await
 }
 
 #[tauri::command]
@@ -136,7 +138,14 @@ fn export_account_bundle_blocking(
     export_account_bundle_to_path(&accounts, &output_path)
 }
 
-fn export_current_auth_json_blocking(output_path: String) -> AppResult<AuthJsonExportResult> {
+fn export_selected_auth_json_blocking(
+    account_ids: Vec<String>,
+    output_path: String,
+) -> AppResult<AuthJsonExportResult> {
+    if account_ids.is_empty() {
+        return Err("请选择至少一个要导出 auth.json 的账号。".to_string());
+    }
+
     let output_path = PathBuf::from(output_path);
     if output_path
         .extension()
@@ -146,36 +155,29 @@ fn export_current_auth_json_blocking(output_path: String) -> AppResult<AuthJsonE
         return Err("导出文件必须是 .zip 压缩包。".to_string());
     }
 
-    let settings = load_settings()?;
-    let auth_path = PathBuf::from(settings.codex_home).join("auth.json");
-    if !auth_path.exists() {
-        return Err(format!("当前 Codex home 中不存在 auth.json：{}", auth_path.display()));
-    }
-    if !auth_path.is_file() {
-        return Err(format!("auth.json 不是文件：{}", auth_path.display()));
-    }
-    let metadata = fs::metadata(&auth_path).map_err(stringify_io)?;
-    if metadata.len() > MAX_CURRENT_AUTH_EXPORT_BYTES {
-        return Err("auth.json 文件过大，已拒绝导出。".to_string());
+    let mut accounts = Vec::with_capacity(account_ids.len());
+    for account_id in account_ids {
+        accounts.push(load_account(&account_id)?);
     }
 
-    let auth_bytes = fs::read(&auth_path).map_err(stringify_io)?;
-    let auth_json: Value = serde_json::from_slice(&auth_bytes)
-        .map_err(|err| format!("auth.json 不是有效 JSON：{err}"))?;
-    let folder_name = current_auth_export_folder_name(&auth_json);
-    write_current_auth_zip(&output_path, &folder_name, &auth_bytes)?;
-
-    Ok(AuthJsonExportResult {
-        path: output_path.to_string_lossy().to_string(),
-        folder_name,
-    })
+    export_auth_jsons_to_path(&accounts, &output_path)
 }
 
-fn write_current_auth_zip(
+fn export_auth_jsons_to_path(
+    accounts: &[StoredAccount],
     output_path: &Path,
-    folder_name: &str,
-    auth_bytes: &[u8],
-) -> AppResult<()> {
+) -> AppResult<AuthJsonExportResult> {
+    if accounts.is_empty() {
+        return Err("请选择至少一个要导出 auth.json 的账号。".to_string());
+    }
+    if output_path
+        .extension()
+        .and_then(|item| item.to_str())
+        .is_none_or(|ext| !ext.eq_ignore_ascii_case("zip"))
+    {
+        return Err("导出文件必须是 .zip 压缩包。".to_string());
+    }
+
     if let Some(parent) = output_path.parent() {
         fs::create_dir_all(parent).map_err(stringify_io)?;
     }
@@ -183,12 +185,43 @@ fn write_current_auth_zip(
     let file = fs::File::create(output_path).map_err(stringify_io)?;
     let mut writer = ZipWriter::new(file);
     let options = SimpleFileOptions::default().compression_method(CompressionMethod::Deflated);
-    writer
-        .start_file(format!("{folder_name}/auth.json"), options)
-        .map_err(|err| err.to_string())?;
-    writer.write_all(auth_bytes).map_err(stringify_io)?;
+    let mut used_folder_names = HashSet::new();
+    let mut folder_names = Vec::with_capacity(accounts.len());
+
+    for account in accounts {
+        let base_folder_name = current_auth_export_folder_name(&account.auth_json);
+        let folder_name = unique_auth_export_folder_name(&base_folder_name, &mut used_folder_names);
+        let auth_bytes = serde_json::to_vec_pretty(&account.auth_json)
+            .map_err(|err| format!("auth.json 序列化失败：{err}"))?;
+
+        writer
+            .start_file(format!("{folder_name}/auth.json"), options)
+            .map_err(|err| err.to_string())?;
+        writer.write_all(&auth_bytes).map_err(stringify_io)?;
+        folder_names.push(folder_name);
+    }
+
     writer.finish().map_err(|err| err.to_string())?;
-    Ok(())
+    Ok(AuthJsonExportResult {
+        path: output_path.to_string_lossy().to_string(),
+        exported_count: folder_names.len(),
+        folder_names,
+    })
+}
+
+fn unique_auth_export_folder_name(base: &str, used: &mut HashSet<String>) -> String {
+    if used.insert(base.to_string()) {
+        return base.to_string();
+    }
+
+    for index in 2.. {
+        let candidate = format!("{base}-{index}");
+        if used.insert(candidate.clone()) {
+            return candidate;
+        }
+    }
+
+    unreachable!("folder name suffix loop should always return")
 }
 
 fn current_auth_export_folder_name(auth_json: &Value) -> String {
@@ -383,8 +416,8 @@ mod tests {
 
     #[test]
     fn auth_export_folder_uses_email_from_exported_auth_id_token() {
-        use base64::Engine;
         use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+        use base64::Engine;
 
         let claims = serde_json::json!({
             "email": "real-user@example.com",
@@ -416,6 +449,58 @@ mod tests {
     fn auth_export_folder_falls_back_to_unknown() {
         let auth_json = serde_json::json!({});
 
-        assert_eq!(current_auth_export_folder_name(&auth_json), "unknown-account");
+        assert_eq!(
+            current_auth_export_folder_name(&auth_json),
+            "unknown-account"
+        );
+    }
+
+    #[test]
+    fn selected_auth_export_writes_only_passed_account_auth_jsons() {
+        let temp = tempfile::tempdir().unwrap();
+        let bundle_path = temp.path().join("selected-auth.zip");
+        let selected = StoredAccount {
+            summary: AccountSummary {
+                id: "selected".to_string(),
+                display_name: "selected@example.com".to_string(),
+                email: Some("metadata-should-not-win@example.com".to_string()),
+                account_id: None,
+                plan: None,
+                expired: None,
+                disabled: false,
+                imported_at: "2026-05-24T00:00:00Z".to_string(),
+                has_config: false,
+                browser_profile_dir: None,
+                oauth_metadata: None,
+                quota_state: None,
+                usage_state: None,
+            },
+            auth_json: serde_json::json!({
+                "email": "selected@example.com",
+                "tokens": {
+                    "account_id": "acct-selected",
+                    "access_token": "access-selected",
+                    "id_token": "id-selected",
+                    "refresh_token": "refresh-selected"
+                }
+            }),
+            original_json: serde_json::json!({}),
+        };
+
+        let result = export_auth_jsons_to_path(&[selected], &bundle_path).unwrap();
+
+        assert_eq!(result.exported_count, 1);
+        assert_eq!(result.folder_names, vec!["selected@example.com"]);
+
+        let file = fs::File::open(&bundle_path).unwrap();
+        let mut archive = zip::ZipArchive::new(file).unwrap();
+        let mut entry = archive.by_name("selected@example.com/auth.json").unwrap();
+        let exported_auth: serde_json::Value = serde_json::from_reader(&mut entry).unwrap();
+        drop(entry);
+
+        assert_eq!(exported_auth["tokens"]["account_id"], "acct-selected");
+        assert!(archive
+            .by_name("metadata-should-not-win@example.com/auth.json")
+            .is_err());
     }
 }

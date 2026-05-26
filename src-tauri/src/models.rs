@@ -76,7 +76,8 @@ pub struct AccountBundleExportResult {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuthJsonExportResult {
     pub path: String,
-    pub folder_name: String,
+    pub exported_count: usize,
+    pub folder_names: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

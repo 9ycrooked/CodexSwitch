@@ -216,7 +216,7 @@ const {
 const {
   chooseAndImport,
   exportSelectedAccounts,
-  exportCurrentAuthJsonOnly,
+  exportSelectedAuthJsonOnly,
   startOAuthLogin,
   closeOAuthLogin,
   refreshTokens,
@@ -283,7 +283,7 @@ function openExportDialog() {
 }
 
 function cancelExportDialog() {
-  if (isOperationActive("accounts:export")) return;
+  if (isOperationActive("accounts:export") || isOperationActive("accounts:export-auth")) return;
   exportDialogOpen.value = false;
 }
 
@@ -308,8 +308,11 @@ async function confirmExportAccounts() {
   }
 }
 
-async function confirmExportCurrentAuthJson() {
-  await exportCurrentAuthJsonOnly();
+async function confirmExportSelectedAuthJson() {
+  const exported = await exportSelectedAuthJsonOnly(selectedExportAccountIds.value);
+  if (exported) {
+    exportDialogOpen.value = false;
+  }
 }
 
 async function confirmDeleteAccount() {
@@ -720,7 +723,7 @@ onMounted(async () => {
             class="modal-close"
             type="button"
             aria-label="关闭导出账号"
-            :disabled="isOperationActive('accounts:export')"
+            :disabled="isOperationActive('accounts:export') || isOperationActive('accounts:export-auth')"
             @click="cancelExportDialog"
           >
             ×
@@ -732,28 +735,11 @@ onMounted(async () => {
           <p>这个文件等同于登录凭据，请只在自己的设备之间迁移。</p>
         </div>
 
-        <section class="export-auth-only-panel">
-          <div>
-            <p class="eyebrow">当前 Codex home</p>
-            <h3>仅导出 auth.json</h3>
-            <p>生成一个 ZIP，内部按账号邮箱建立文件夹，并只放入当前正在使用的 auth.json。</p>
-            <small>auth.json 包含 refresh token，请不要分享给他人。</small>
-          </div>
-          <button
-            class="secondary"
-            type="button"
-            :disabled="isOperationActive('accounts:export-auth')"
-            @click="confirmExportCurrentAuthJson"
-          >
-            {{ isOperationActive("accounts:export-auth") ? "正在导出" : "仅导出 auth.json" }}
-          </button>
-        </section>
-
         <label class="checkbox-row export-select-all">
           <input
             type="checkbox"
             :checked="allExportAccountsSelected"
-            :disabled="isOperationActive('accounts:export')"
+            :disabled="isOperationActive('accounts:export') || isOperationActive('accounts:export-auth')"
             @change="toggleAllExportAccounts(eventChecked($event))"
           />
           <span>全选账号</span>
@@ -764,7 +750,7 @@ onMounted(async () => {
             <input
               type="checkbox"
               :checked="selectedExportAccountIds.includes(account.id)"
-              :disabled="isOperationActive('accounts:export')"
+              :disabled="isOperationActive('accounts:export') || isOperationActive('accounts:export-auth')"
               @change="toggleExportAccount(account.id, eventChecked($event))"
             />
             <span>
@@ -776,12 +762,33 @@ onMounted(async () => {
         </div>
 
         <div class="modal-actions">
-          <button class="secondary" type="button" :disabled="isOperationActive('accounts:export')" @click="cancelExportDialog">
+          <button
+            class="secondary"
+            type="button"
+            :disabled="
+              isOperationActive('accounts:export') ||
+              isOperationActive('accounts:export-auth') ||
+              !selectedExportAccountIds.length
+            "
+            @click="confirmExportSelectedAuthJson"
+          >
+            {{ isOperationActive("accounts:export-auth") ? "正在导出" : "仅导出 auth.json" }}
+          </button>
+          <button
+            class="secondary"
+            type="button"
+            :disabled="isOperationActive('accounts:export') || isOperationActive('accounts:export-auth')"
+            @click="cancelExportDialog"
+          >
             取消
           </button>
           <button
             type="button"
-            :disabled="isOperationActive('accounts:export') || !selectedExportAccountIds.length"
+            :disabled="
+              isOperationActive('accounts:export') ||
+              isOperationActive('accounts:export-auth') ||
+              !selectedExportAccountIds.length
+            "
             @click="confirmExportAccounts"
           >
             {{ isOperationActive("accounts:export") ? "正在导出" : `导出 ${selectedExportAccountIds.length} 个账号` }}

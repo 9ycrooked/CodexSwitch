@@ -131,9 +131,14 @@ export function useAccounts(deps: {
       .replace("T", "-");
   }
 
-  async function exportCurrentAuthJsonOnly() {
+  async function exportSelectedAuthJsonOnly(accountIds: string[]) {
+    if (!accountIds.length) {
+      deps.setMessage("error", "请选择至少一个要导出 auth.json 的账号");
+      return false;
+    }
+
     const outputPath = await save({
-      defaultPath: `codex-auth-${compactTimestamp()}.zip`,
+      defaultPath: `codex-auth-selected-${compactTimestamp()}.zip`,
       filters: [{ name: "Codex auth.json ZIP", extensions: ["zip"] }]
     });
     if (!outputPath) return false;
@@ -141,8 +146,12 @@ export function useAccounts(deps: {
     let exported = false;
     await runOperation("accounts:export-auth", async () => {
       try {
-        const result = await api.exportCurrentAuthJson(outputPath);
-        deps.setMessage("success", `auth.json 已导出到 ${result.folder_name}/auth.json`);
+        const result = await api.exportSelectedAuthJson(accountIds, outputPath);
+        const detail =
+          result.exported_count === 1 && result.folder_names[0]
+            ? `auth.json 已导出到 ${result.folder_names[0]}/auth.json`
+            : `已导出 ${result.exported_count} 个 auth.json`;
+        deps.setMessage("success", detail);
         exported = true;
       } catch (err) {
         deps.setMessage("error", String(err));
@@ -281,7 +290,7 @@ export function useAccounts(deps: {
     chooseAndImport,
     importBundlePaths,
     exportSelectedAccounts,
-    exportCurrentAuthJsonOnly,
+    exportSelectedAuthJsonOnly,
     startOAuthLogin,
     closeOAuthLogin,
     refreshTokens,

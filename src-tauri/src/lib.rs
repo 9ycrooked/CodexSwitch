@@ -25,7 +25,7 @@ pub fn run() {
             commands::import_accounts,
             commands::import_account_bundle,
             commands::export_account_bundle,
-            commands::export_current_auth_json,
+            commands::export_selected_auth_json,
             commands::delete_account,
             accounts::list_accounts,
             backups::list_backups,

@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Codex Switch",
-  "version": "0.3.5",
+  "version": "0.3.6",
   "identifier": "local.codex.account-switcher",
   "build": {
     "beforeDevCommand": "yarn dev",
@@ -15,10 +15,10 @@
         "title": "Codex Switch",
         "decorations": false,
         "center": true,
-        "width": 1120,
+        "width": 960,
         "height": 760,
-        "minWidth": 1120,
-        "minHeight": 620
+        "minWidth": 900,
+        "minHeight": 720
       }
     ],
     "security": {

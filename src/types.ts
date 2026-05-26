@@ -133,7 +133,8 @@ export type AccountBundleExportResult = {
 
 export type AuthJsonExportResult = {
   path: string;
-  folder_name: string;
+  exported_count: number;
+  folder_names: string[];
 };
 
 export type AccountBundleImportFailure = {

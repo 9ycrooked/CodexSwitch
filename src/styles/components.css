@@ -182,7 +182,6 @@
 .delete-account-copy,
 .delete-profile-option,
 .export-account-copy,
-.export-auth-only-panel,
 .export-select-all,
 .export-account-list {
   margin-top: 14px;
@@ -229,43 +228,6 @@
 
 .export-account-copy p {
   margin: 0;
-}
-
-.export-auth-only-panel {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  border: 1px solid color-mix(in srgb, var(--warning-border) 58%, var(--border-color));
-  border-radius: var(--radius-md);
-  padding: 12px;
-  background: color-mix(in srgb, var(--warning-bg) 44%, var(--bg-secondary));
-}
-
-.export-auth-only-panel div {
-  display: grid;
-  gap: 4px;
-  min-width: 0;
-}
-
-.export-auth-only-panel h3 {
-  font-size: 15px;
-}
-
-.export-auth-only-panel p,
-.export-auth-only-panel small {
-  color: var(--text-secondary);
-  font-size: 13px;
-  line-height: 1.45;
-}
-
-.export-auth-only-panel small {
-  color: var(--warning-text);
-  font-weight: 700;
-}
-
-.export-auth-only-panel button {
-  flex: 0 0 auto;
 }
 
 .export-select-all {

@@ -57,10 +57,6 @@ function inputValue(event: Event) {
         :class="['account-card file-card', { current: isCurrentAccount(account, current), disabled: account.disabled }]"
       >
         <div class="file-card-layout">
-          <div class="provider-avatar" aria-hidden="true">
-            <span>C</span>
-          </div>
-
           <div class="file-card-main">
             <div class="card-header">
               <div class="card-header-content">
@@ -111,13 +107,13 @@ function inputValue(event: Event) {
 
             <div class="card-actions">
               <button class="primary-action-button" :disabled="busy" @click="$emit('selectQuotaAccount', account)">
-                查看额度
+                额度
               </button>
               <button :disabled="busy || isOperationActive('refresh-token:' + account.id)" @click="$emit('refreshTokens', account)">
-                刷新认证
+                刷新
               </button>
               <button :disabled="busy || isOperationActive('relogin:' + account.id)" @click="$emit('reloginAccount', account)">
-                重新登录
+                登录
               </button>
               <button
                 class="secondary danger-button"

@@ -99,8 +99,8 @@ export function exportAccountBundle(accountIds: string[], outputPath: string) {
   return invoke<AccountBundleExportResult>("export_account_bundle", { accountIds, outputPath });
 }
 
-export function exportCurrentAuthJson(outputPath: string) {
-  return invoke<AuthJsonExportResult>("export_current_auth_json", { outputPath });
+export function exportSelectedAuthJson(accountIds: string[], outputPath: string) {
+  return invoke<AuthJsonExportResult>("export_selected_auth_json", { accountIds, outputPath });
 }
 
 export function deleteAccount(accountId: string, deleteProfile: boolean) {

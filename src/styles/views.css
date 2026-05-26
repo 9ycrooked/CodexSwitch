@@ -7,7 +7,7 @@
 
 .quota-card-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 14px;
 }
 
@@ -92,16 +92,18 @@
 
 .quota-card-actions {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  flex-wrap: nowrap;
+  gap: 6px;
   padding-top: 2px;
 }
 
 .quota-card-actions button {
-  min-height: 36px;
+  min-width: 0;
+  min-height: 32px;
   border-radius: 7px;
-  padding: 8px 10px;
-  font-size: 13px;
+  padding: 6px 8px;
+  font-size: 12px;
+  white-space: nowrap;
 }
 
 .quota-account-list,
@@ -228,7 +230,7 @@
 
 .account-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 14px;
 }
 
@@ -559,21 +561,22 @@ dd {
 
 .card-actions {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+  flex-wrap: nowrap;
+  gap: 5px;
   padding-top: 6px;
 }
 
 .card-actions button {
   min-width: 0;
-  min-height: 34px;
+  min-height: 32px;
   border-radius: 7px;
-  padding: 7px 9px;
+  padding: 6px 8px;
   font-size: 12px;
+  white-space: nowrap;
 }
 
 .primary-action-button {
-  flex: 1 1 auto;
+  flex: 1 1 0;
 }
 
 .backup-list,
@@ -1022,7 +1025,7 @@ dd {
   }
 }
 
-@media (max-width: 1024px) {
+@media (max-width: 860px) {
   .shell {
     display: grid;
     grid-template-columns: 1fr;

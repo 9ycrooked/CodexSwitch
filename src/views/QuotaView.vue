@@ -66,7 +66,6 @@ defineEmits<{
         @click="$emit('update:selectedQuotaAccountId', account.id)"
       >
         <div class="quota-card-head">
-          <div class="provider-avatar compact" aria-hidden="true">C</div>
           <div class="quota-card-title">
             <div class="card-badge-row">
               <span class="type-badge codex-type">Codex</span>
@@ -78,7 +77,6 @@ defineEmits<{
               </span>
             </div>
             <h3>{{ account.display_name }}</h3>
-            <p>{{ account.email || account.account_id || "无账号标识" }}</p>
           </div>
         </div>
 
@@ -140,27 +138,27 @@ defineEmits<{
             "
             @click.stop="$emit('switchAccount', account)"
           >
-            {{ isCurrentAccount(account, current) ? "当前账号" : "切换到此账号" }}
+            {{ isCurrentAccount(account, current) ? "当前" : "切换" }}
           </button>
           <button
             class="secondary"
             :disabled="busy || isOperationActive('quota:all') || isOperationActive('refresh-token:' + account.id)"
             @click.stop="$emit('refreshTokens', account)"
           >
-            刷新 token
+            刷新
           </button>
           <button
             :disabled="busy || isOperationActive('quota:all') || isOperationActive('quota:' + account.id)"
             @click.stop="$emit('fetchUsage', account)"
           >
-            检查额度
+            检查
           </button>
           <button
             class="secondary"
             :disabled="busy || isOperationActive('quota:all') || !account.usage_state || isOperationActive('quota:' + account.id)"
             @click.stop="$emit('clearUsage', account)"
           >
-            清除记录
+            清除
           </button>
         </div>
       </article>
